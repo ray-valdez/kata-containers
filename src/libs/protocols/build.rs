@@ -244,8 +244,22 @@ fn real_main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+fn real_main_grpctls() -> Result<(), std::io::Error> {
+    tonic_build::configure()
+        .out_dir("src/grpctls")
+        .compile(
+            &["secprotos/secagent.proto"], &["secprotos"],
+        )?;
+   Ok(())
+}
+
 fn main() {
     if let Err(e) = real_main() {
+        eprintln!("ERROR: {}", e);
+        exit(1);
+    }
+
+    if let Err(e) = real_main_grpctls() {
         eprintln!("ERROR: {}", e);
         exit(1);
     }

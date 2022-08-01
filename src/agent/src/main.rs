@@ -407,6 +407,11 @@ async fn start_sandbox(
     let mut server = rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
     server.start().await?;
 
+    // ipaddr://ip:port
+    let gserver = rpc::grpcstart(sandbox.clone(), config.server_addr.as_str())?;
+
+    gserver.await?;
+
     rx.await?;
     server.shutdown().await?;
 

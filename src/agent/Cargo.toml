@@ -5,6 +5,9 @@ authors = ["The Kata Containers community <kata-dev@lists.katacontainers.io>"]
 edition = "2018"
 license = "Apache-2.0"
 
+[build-dependencies]
+tonic-build = "0.7"
+
 [dependencies]
 oci = { path = "../libs/oci" }
 rustjail = { path = "rustjail" }
@@ -26,6 +29,8 @@ kata-types = { path = "../libs/kata-types" }
 const_format = "0.2.30"
 url = "2.2.2"
 derivative = "2.2.0"
+prost = "0.10"
+tonic = {version="0.7", features = ["tls"]}
 
 # Async helpers
 async-trait = "0.1.42"
@@ -33,7 +38,7 @@ async-recursion = "0.3.2"
 futures = "0.3.28"
 
 # Async runtime
-tokio = { version = "1.28.1", features = ["full"] }
+tokio = { version = "1.28.1", features = ["full", "macros", "rt-multi-thread"] }
 tokio-vsock = "0.3.1"
 
 netlink-sys = { version = "0.7.0", features = ["tokio_socket"] }

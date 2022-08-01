@@ -20,5 +20,10 @@ serde_json = { version = "1.0.68", optional = true }
 oci = { path = "../oci" }
 
 [build-dependencies]
+<<<<<<< HEAD
 ttrpc-codegen = "0.4.2"
 protobuf = { version = "3.2.0" }
+=======
+ttrpc-codegen = "0.2.0"
+tonic-build = "0.7"
+>>>>>>> 23ddaa879 (agent: add initial grpctls server)
