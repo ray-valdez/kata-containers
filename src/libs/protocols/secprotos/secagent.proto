@@ -11,14 +11,11 @@ syntax = "proto3";
 
 import "oci.proto";
 
-//import "google/protobuf/empty.proto";
-
 package  grpctls;
 // unstable
 service SecAgentService {
-	// rpc ExecProcess(ExecProcessRequest) returns (EmptyResponse);
 	rpc SecPauseContainer(SecPauseContainerRequest) returns (EmptyResponse);
-	// rpc SecResumeContainer(SecResumeContainerRequest) returns (EmptyResponse);
+	rpc SecResumeContainer(SecResumeContainerRequest) returns (EmptyResponse);
 
 }
 
@@ -26,24 +23,8 @@ message SecPauseContainerRequest {
     string container_id = 1;
 }
 
-/*
 message SecResumeContainerRequest {
     string container_id = 1;
 }
-*/
-
-message StringUser {
-        string uid = 1;
-        string gid = 2;
-        repeated string additionalGids = 3;
-}
 
 message EmptyResponse {}
-/*
-message ExecProcessRequest {
-        string container_id = 1;
-        string exec_id = 2;
-        StringUser string_user = 3;
-        Process process = 4;
-}
-*/

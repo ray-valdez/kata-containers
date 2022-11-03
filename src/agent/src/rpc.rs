@@ -102,7 +102,7 @@ use tonic::{
         Server, ServerTlsConfig,
     },
 };
-use crate::rpc::grpctls::{SecPauseContainerRequest, EmptyResponse};
+use crate::rpc::grpctls::{SecPauseContainerRequest, SecResumeContainerRequest, EmptyResponse};
 use std::net::SocketAddr;
 
 pub mod grpctls {
@@ -1695,6 +1695,41 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
 
         Ok(tonic::Response::new(EmptyResponse{}))
     }
+    
+    async fn sec_resume_container(
+        &self,
+        req: tonic::Request<SecResumeContainerRequest>,
+    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+
+        let _conn_info = req
+            .extensions()
+            .get::<TlsConnectInfo<TcpConnectInfo>>()
+            .unwrap();
+
+        // TBD: Need to add trace
+        // trace_rpc_call!(conn_info, "SecAgent: pause_container", req);
+        // is_allowed!(req);
+
+        let cid = req.into_inner().container_id;
+        let s = Arc::clone(&self.sandbox);
+        let mut sandbox = s.lock().await;
+
+        let ctr = sandbox.get_container(&cid).ok_or_else(|| {
+             tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("SA invalid container id"))
+        })?;
+
+        ctr.resume()
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("Service was not ready: {:?}", e)
+                )})?;
+
+        Ok(tonic::Response::new(EmptyResponse{}))
+    }
+    
 }
 
 #[derive(Clone)]
@@ -1874,14 +1909,14 @@ pub fn grpcstart(s: Arc<Mutex<Sandbox>>,server_address: &str) -> Result<impl fut
     let addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
 
     // Config TLS
-    let cert = include_str!("../keys/server.pem");
-    let key = include_str!("../keys/server.key");
+    let cert = include_str!("../grpc_tls_keys/server.pem");
+    let key = include_str!("../grpc_tls_keys/server.key");
 
     // create identity from cert and key
     let id = tonic::transport::Identity::from_pem(cert.as_bytes(), key.as_bytes());
 
     // Reading ca root from disk
-    let pem = include_str!("../keys/my_ca.pem");
+    let pem = include_str!("../grpc_tls_keys/ca.pem");
 
     // Create certificate
     let ca = tonic::transport::Certificate::from_pem(pem.as_bytes());

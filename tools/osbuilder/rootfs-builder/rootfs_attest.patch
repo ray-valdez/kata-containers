@@ -1,0 +1,72 @@
+diff --git a/tools/osbuilder/rootfs-builder/ubuntu/Dockerfile.in b/tools/osbuilder/rootfs-builder/ubuntu/Dockerfile.in
+index d1cf0b9da..490b47b91 100644
+--- a/tools/osbuilder/rootfs-builder/ubuntu/Dockerfile.in
++++ b/tools/osbuilder/rootfs-builder/ubuntu/Dockerfile.in
+@@ -40,7 +40,8 @@ RUN apt-get update && \
+     pkg-config \
+     protobuf-compiler \
+     gettext-base \
+-    umoci \ 
++    umoci \
++    wget \
+     kmod
+ 
+ # aarch64 requires this name -- link for all
+diff --git a/tools/osbuilder/rootfs-builder/ubuntu/config.sh b/tools/osbuilder/rootfs-builder/ubuntu/config.sh
+index 4311660a6..b95efa5a0 100644
+--- a/tools/osbuilder/rootfs-builder/ubuntu/config.sh
++++ b/tools/osbuilder/rootfs-builder/ubuntu/config.sh
+@@ -23,7 +23,7 @@ esac
+ if [ "${AA_KBC}" == "eaa_kbc" ] && [ "${ARCH}" == "x86_64" ]; then
+ 	PACKAGES+=" apt gnupg"
+ 	AA_KBC_EXTRAS="
+-RUN echo 'deb [arch=amd64] http://mirrors.openanolis.cn/inclavare-containers/ubuntu20.04 bionic main' \| tee /etc/apt/sources.list.d/inclavare-containers.list; \
++RUN echo 'deb [arch=amd64] http://mirrors.openanolis.cn/inclavare-containers/ubuntu20.04 focal main' \| tee /etc/apt/sources.list.d/inclavare-containers.list; \
+     curl -L http://mirrors.openanolis.cn/inclavare-containers/ubuntu20.04/DEB-GPG-KEY.key \| apt-key add -; \
+     apt-get update; \
+     apt-get install -y rats-tls
+diff --git a/tools/osbuilder/rootfs-builder/ubuntu/rootfs_lib.sh b/tools/osbuilder/rootfs-builder/ubuntu/rootfs_lib.sh
+index 90c13dd0a..31ae3e421 100644
+--- a/tools/osbuilder/rootfs-builder/ubuntu/rootfs_lib.sh
++++ b/tools/osbuilder/rootfs-builder/ubuntu/rootfs_lib.sh
+@@ -34,11 +34,37 @@ EOF
+ 	rm -rf $rootfs_dir/usr/share/{bash-completion,bug,doc,info,lintian,locale,man,menu,misc,pixmaps,terminfo,zsh}
+ 
+ 	if [ "${AA_KBC}" == "eaa_kbc" ] && [ "${ARCH}" == "x86_64" ]; then
+-		curl -L http://mirrors.openanolis.cn/inclavare-containers/ubuntu20.04/DEB-GPG-KEY.key | chroot "$rootfs_dir" apt-key add -
++               wget https://mirrors.kernel.org/ubuntu/pool/main/p/protobuf-c/libprotobuf-c1_1.3.3-1ubuntu2.1_amd64.deb -P $rootfs_dir
++                chroot  "$rootfs_dir" dpkg -i libprotobuf-c1_1.3.3-1ubuntu2.1_amd64.deb
++
++		wget https://download.01.org/intel-sgx/sgx-dcap/1.14/linux/distro/ubuntu20.04-server/sgx_debian_local_repo.tgz -P $rootfs_dir
++		chroot  "$rootfs_dir" tar zxvf sgx_debian_local_repo.tgz
+ 		cat << EOF | chroot "$rootfs_dir"
+-echo 'deb [arch=amd64] http://mirrors.openanolis.cn/inclavare-containers/ubuntu20.04 bionic main' | tee /etc/apt/sources.list.d/inclavare-containers.list
++echo 'deb [trusted=yes arch=amd64] file:/sgx_debian_local_repo focal main' | tee /etc/apt/sources.list.d/sgx_debian_local_repo.list
+ apt-get update
+-apt-get install -y rats-tls
++apt-get install -y libtdx-attest libtdx-attest-dev
++apt-get install -y libsgx-dcap-default-qpl
++apt-get install -y libsgx-dcap-default-qpl-dev
++apt-get install -y libsgx-dcap-quote-verify-dev
++apt-get install -y libsgx-dcap-ql-dev
++apt-get install libc6-dev
++cd /opt/intel/tdx-quote-generation-sample
++make
++EOF
++		cat << EOF | chroot "$rootfs_dir"
++echo 'port=4050' | tee /etc/tdx-attest.conf
++EOF
++
++
++		cat << EOF | chroot "$rootfs_dir"
++mkdir zip
++cd zip
++wget --no-check-certificate  https://github.com/inclavare-containers/inclavare-containers/archive/refs/heads/master.zip
++unzip master.zip
++cd inclavare-containers-master/rats-tls
++sed -i 's/set(EXTRA_LINK_LIBRARY tdx_attest)/set(EXTRA_LINK_LIBRARY :libtdx_attest.so.1)/g' ./src/attesters/tdx-ecdsa/CMakeLists.txt
++cmake -DRATS_TLS_BUILD_MODE="tdx" -DBUILD_SAMPLES=on -H. -Bbuild
++make -C build install
+ EOF
+ 	fi
+ }

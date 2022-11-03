@@ -12,6 +12,7 @@ set -o errtrace
 
 script_name="${0##*/}"
 script_dir="$(dirname $(readlink -f $0))"
+export OUT_DIR="${script_dir}/../../../src/libs/protocols/src/grpctls"
 AGENT_VERSION=${AGENT_VERSION:-}
 RUST_VERSION="null"
 AGENT_BIN=${AGENT_BIN:-kata-agent}

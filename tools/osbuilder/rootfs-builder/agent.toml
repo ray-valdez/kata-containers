@@ -1,0 +1,48 @@
+aa_kbc_params = "eaa_kbc::9.2.220.87:30000"
+debug_console = true
+dev_mode = false
+log_level = "debug"
+#hotplug_timeout = 3
+debug_console_vport = 1026
+log_vport = 0
+container_pipe_size = 0
+server_addr = "vsock://-1:1024"
+unified_cgroup_hierarchy = false
+tracing = false
+
+[endpoints]
+# "ReseedRandomDevRequest",
+allowed = [
+        "AddARPNeighborsRequest",
+        "AddSwapRequest",
+        "CloseStdinRequest",
+        "CopyFileRequest",
+        "CreateContainerRequest",
+        "CreateSandboxRequest",
+        "DestroySandboxRequest",
+        "ExecProcessRequest",
+        "GetMetricsRequest",
+        "GetOOMEventRequest",
+        "GuestDetailsRequest",
+        "ListInterfacesRequest",
+        "ListRoutesRequest",
+        "MemHotplugByProbeRequest",
+        "OnlineCPUMemRequest",
+        "PauseContainerRequest",
+        "PullImageRequest",
+        "ReadStreamRequest",
+        "RemoveContainerRequest",
+        "ResumeContainerRequest",
+        "SetGuestDateTimeRequest",
+        "SignalProcessRequest",
+        "StartContainerRequest",
+        "StartTracingRequest",
+        "StatsContainerRequest",
+        "StopTracingRequest",
+        "TtyWinResizeRequest",
+        "UpdateContainerRequest",
+        "UpdateInterfaceRequest",
+        "UpdateRoutesRequest",
+        "WaitProcessRequest",
+        "WriteStreamRequest"
+        ]
