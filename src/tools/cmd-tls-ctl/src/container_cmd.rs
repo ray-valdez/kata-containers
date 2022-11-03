@@ -8,7 +8,7 @@ pub mod grpctls {
 }
 
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
-use grpctls::{PauseContainerRequest, ResumeContainerRequest};
+use grpctls::{SecPauseContainerRequest, SecResumeContainerRequest};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,14 +26,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("url_string {}", url_string);
 
     // Get certificate from disk
-    let cert = include_str!("../keys/client.pem");
-    let key = include_str!("../keys/client.key");
+    let cert = include_str!("../grpc_tls_keys/client.pem");
+    let key = include_str!("../grpc_tls_keys/client.key");
 
     // Create identify from key and certificate
     let id = tonic::transport::Identity::from_pem(cert.as_bytes(), key.as_bytes());
 
     // Import our certificate for CA
-    let s = include_str!("../keys/my_ca.pem");
+    let s = include_str!("../grpc_tls_keys/ca.pem");
 
     // Convert it into a certificate
     let ca = tonic::transport::Certificate::from_pem(s.as_bytes());
@@ -52,18 +52,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match config.cmd {
         PauseKind::PAUSE => {
-            let request = tonic::Request::new(PauseContainerRequest {
+            let request = tonic::Request::new(SecPauseContainerRequest {
                 container_id: config.cid,
             });
-            let response = client.pause_container(request).await?.into_inner();
+            let response = client.sec_pause_container(request).await?.into_inner();
             println!("RESPONSE={:?}", response);
         }
 
         PauseKind::RESUME => {
-            let request = tonic::Request::new(ResumeContainerRequest {
+            let request = tonic::Request::new(SecResumeContainerRequest {
                 container_id: config.cid,
             });
-            let response = client.resume_container(request).await?.into_inner();
+            let response = client.sec_resume_container(request).await?.into_inner();
             println!("RESPONSE={:?}", response);
         }
     }

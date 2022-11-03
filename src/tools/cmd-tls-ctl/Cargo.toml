@@ -47,6 +47,6 @@ tokio = { version = "1.14.0", features = ["full", "macros", "rt-multi-thread"] }
 tonic-build = "0.7"
 
 [[bin]] # Bin to run gRPC client
-name = "container_cmd"
+name = "cmd-tls-ctl"
 path = "src/container_cmd.rs"
 
