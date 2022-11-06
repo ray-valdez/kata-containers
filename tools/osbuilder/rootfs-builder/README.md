@@ -55,6 +55,37 @@ To build a rootfs for your chosen distribution, run:
 $ sudo ./rootfs.sh <distro>
 ```
 
+## Creating a rootfs with EAA protocol and grpc tls channel support
+
+1. Create TLS keys and certificates for`kata-agent`and client using the grpc tls channel.
+  ```bash
+ $ pushd ../../../src/agent/grpc_tls_keys
+ $  ./gen_key_cert.sh
+ $ popd
+  ```
+
+2. Apply patch to enable build with RATS supporting `tdx_ecdsa` attester on tdx enabled platform.
+  ```bash
+  $ git apply attest.patch
+  ```
+
+3. Set environment variables.
+  ```bash
+  $ export distro=ubuntu
+  $ export ROOTFS_DIR=$PWD/rootfs
+  ```
+
+4. Build root image.
+    ```bash
+   $  sudo -E GOPATH=$GOPATH USE_PODMAN=true SECCOMP=no UMOCI=yes AA_KBC=eaa_kbc EXTRA_PKGS="wget vim tar gcc g++ make cmake git openssh-client unzip libssl-dev " ./rootfs.sh ${distro}
+    ``` 
+
+5. Copy agent configuration file,`agent.toml`, file to rootfs. Note that you may need to update the `aa_kbc_params`configuration in the file with the address of your key broker service provider. 
+
+  ```bash
+  $ sudo cp agent.toml rootfs/root
+  ```
+
 ## Creating a rootfs with kernel modules
 
 To build a rootfs with additional kernel modules, run:

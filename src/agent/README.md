@@ -56,6 +56,22 @@ $ git -C ${dir} clone --depth 1 https://github.com/kata-containers/kata-containe
 $ make -C ${dir}/kata-containers/src/agent
 ```
 
+> **Note:**
+>
+> This agent has been extended with a grpc tls channel for securely receiving requests.  
+> To generate TLS key pairs and certificates, execute the following:
+>```sh 
+>$ pushd ${dir}/kata-containers/src/agent/grpc_tls_keys
+>$ ./gen_key_cert.sh
+>$ popd
+>```
+> 
+> Set environmental variable to the generated grpc tls protocol files:
+>```sh
+>$ export OUT_DIR=${dir}/kata-containers/src/libs/protocols/src/grpctls
+>$ make -C ${dir}/kata-containers/src/agent
+>
+
 ## Change the agent API
 
 The Kata runtime communicates with the Kata agent using a ttRPC based API protocol.
