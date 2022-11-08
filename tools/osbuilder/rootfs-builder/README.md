@@ -55,7 +55,7 @@ To build a rootfs for your chosen distribution, run:
 $ sudo ./rootfs.sh <distro>
 ```
 
-## Creating a rootfs with EAA protocol and grpc tls channel support
+## Creating a rootfs with Enclave Attestation Architecture (*EAA*) protocol and grpc tls channel support
 
 1. Create TLS keys and certificates for`kata-agent`and client using the grpc tls channel.
   ```bash
@@ -80,9 +80,10 @@ $ sudo ./rootfs.sh <distro>
    $  sudo -E GOPATH=$GOPATH USE_PODMAN=true SECCOMP=no UMOCI=yes AA_KBC=eaa_kbc EXTRA_PKGS="wget vim tar gcc g++ make cmake git openssh-client unzip libssl-dev " ./rootfs.sh ${distro}
     ``` 
 
-5. Copy agent configuration file,`agent.toml`, file to rootfs. Note that you may need to update the `aa_kbc_params`configuration in the file with the address of your key broker service provider. 
+5. Copy agent configuration file,`agent.toml`, file to rootfs; but first, update the `aa_kbc_params`configuration in the file with the **IP address** and **port number** of your key broker service provider, e.g., `verdictd`. 
 
   ```bash
+  $ # In agent.toml update: KBS_IP_ADDRESS and KBS_PORT_NUMBER fields
   $ sudo cp agent.toml rootfs/root
   ```
 

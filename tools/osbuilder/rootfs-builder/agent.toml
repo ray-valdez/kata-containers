@@ -1,4 +1,4 @@
-aa_kbc_params = "eaa_kbc::9.2.220.87:30000"
+aa_kbc_params = "eaa_kbc::KBS_IP_ADDRESS:KBS_PORT_NUMBER"
 debug_console = true
 dev_mode = false
 log_level = "debug"
