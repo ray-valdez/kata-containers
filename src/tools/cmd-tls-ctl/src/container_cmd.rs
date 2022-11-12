@@ -1,4 +1,4 @@
-use cmd_tls_ctl::{Config, PauseKind};
+use cmd_tls_ctl::{Config, CmdKind};
 use std::env;
 use std::process;
 
@@ -8,7 +8,7 @@ pub mod grpctls {
 }
 
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
-use grpctls::{SecPauseContainerRequest, SecResumeContainerRequest};
+use grpctls::{SecPauseContainerRequest, SecResumeContainerRequest, SecListContainersRequest};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -51,7 +51,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = SecAgentServiceClient::new(channel);
 
     match config.cmd {
-        PauseKind::PAUSE => {
+        CmdKind::LISTCONTAINERS => {
+            let request = tonic::Request::new(SecListContainersRequest {
+            });
+            let response = client.sec_list_containers(request).await?.into_inner();
+            println!("RESPONSE={:?}", response);
+        }
+
+        CmdKind::PAUSE => {
             let request = tonic::Request::new(SecPauseContainerRequest {
                 container_id: config.cid,
             });
@@ -59,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("RESPONSE={:?}", response);
         }
 
-        PauseKind::RESUME => {
+        CmdKind::RESUME => {
             let request = tonic::Request::new(SecResumeContainerRequest {
                 container_id: config.cid,
             });
@@ -67,15 +74,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("RESPONSE={:?}", response);
         }
     }
-    // Create a new Request
-    /*
-    let request = tonic::Request::new(PauseContainerRequest {
-        container_id: config.cid,
-    });
-
-    // Send request and waiting for response
-    let response = client.pause_container(request).await?.into_inner();
-    println!("RESPONSE={:?}", response);
-    */
     Ok(())
 }

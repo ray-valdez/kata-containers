@@ -102,7 +102,7 @@ use tonic::{
         Server, ServerTlsConfig,
     },
 };
-use crate::rpc::grpctls::{SecPauseContainerRequest, SecResumeContainerRequest, EmptyResponse};
+use crate::rpc::grpctls::{SecPauseContainerRequest, SecResumeContainerRequest, SecListContainersRequest, SecContainerInfoList, EmptyResponse};
 use std::net::SocketAddr;
 
 pub mod grpctls {
@@ -1729,7 +1729,26 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
 
         Ok(tonic::Response::new(EmptyResponse{}))
     }
-    
+
+    async fn sec_list_containers(
+        &self,
+        _req: tonic::Request<SecListContainersRequest>,
+    ) -> Result<tonic::Response<SecContainerInfoList>, tonic::Status> {
+
+        let s = Arc::clone(&self.sandbox);
+        let sandbox = s.lock().await;
+        let list = sandbox.list_containers()
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("List Contianer Service was not ready: {:?}", e)
+                )})?;
+
+        Ok(tonic::Response:: new(SecContainerInfoList{
+            sec_container_info_list: list.clone(),
+        }))
+
+    }
 }
 
 #[derive(Clone)]

@@ -1,10 +1,12 @@
-pub enum PauseKind {
+#[derive(PartialEq)]
+pub enum CmdKind {
     PAUSE,
     RESUME,
+    LISTCONTAINERS,
 }
 
 pub struct Config {
-    pub cmd: PauseKind,
+    pub cmd: CmdKind,
     pub address: String,
     pub cid: String,
 }
@@ -13,14 +15,16 @@ impl Config {
     pub fn new(mut args: std::env::Args) -> Result<Config, &'static str> {
         args.next(); // skip name of program
 
-        let cmd: PauseKind = match args.next() {
+        let cmd: CmdKind = match args.next() {
             Some(arg) => {
                 if arg.eq("pause") {
-                    PauseKind::PAUSE
+                    CmdKind::PAUSE
                 } else if arg.eq("resume") {
-                    PauseKind::RESUME
+                    CmdKind::RESUME
+                } else if arg.eq("listcontainers") {
+                    CmdKind::LISTCONTAINERS
                 } else {
-                    return Err("Incorrect command: [pause | resume]");
+                    return Err("Incorrect command: [pause | resume | listcontainers]");
                 }
             }
             None => return Err("Missing: [pause | resume]"),
@@ -30,6 +34,10 @@ impl Config {
             Some(arg) => arg,
             None => return Err("Missing: [kata_agent IP address]"),
         };
+        
+        if cmd == CmdKind::LISTCONTAINERS {
+            return Ok(Config { cmd, address, cid: "None".to_string() });            
+        }
 
         let cid = match args.next() {
             Some(arg) => arg,

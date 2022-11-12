@@ -16,6 +16,7 @@ package  grpctls;
 service SecAgentService {
 	rpc SecPauseContainer(SecPauseContainerRequest) returns (EmptyResponse);
 	rpc SecResumeContainer(SecResumeContainerRequest) returns (EmptyResponse);
+	rpc SecListContainers(SecListContainersRequest) returns(SecContainerInfoList);
 
 }
 
@@ -25,6 +26,20 @@ message SecPauseContainerRequest {
 
 message SecResumeContainerRequest {
     string container_id = 1;
+}
+
+message SecListContainersRequest {
+}
+
+message SecContainerInfo {
+    string container_id = 1;
+    uint64 created = 2;
+    string state = 3;
+    string annotations = 4;
+}
+
+message SecContainerInfoList {
+   repeated SecContainerInfo SecContainerInfoList = 1; 
 }
 
 message EmptyResponse {}

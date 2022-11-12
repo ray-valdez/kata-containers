@@ -3,8 +3,8 @@
 ## Overview
 
 The Kata Containers command control tool (`cmd-tls-ctl`) is a low-level test
-tool. It currently supports two endpoint commands,`pause`and`resume`, with
-the Kata Containers agent,`kata-agent`, that runs inside the virtual machine (VM).
+tool. It currently supports two endpoint commands, `pause`, `resume`, and` list_containers`, with
+the Kata Containers agent, `kata-agent`, that runs inside the virtual machine (VM).
 
 ## Audience and environment
 
@@ -53,7 +53,7 @@ $ make
         
 ## Run
 
-The tool currently supports container`resume`and`pause`commands. Running the tool requires specifying the IP address of the VM where the`kata-agent`runs and the ID of an executing container.
+The tool currently supports container `resume` and `pause` commands. Running the tool requires specifying the IP address of the VM where the `kata-agent` runs and the ID of an executing container.
 
 Use `crictl` to get the address of the Pod:
 
@@ -63,24 +63,35 @@ $ crictl inspectp --output table $POD_ID | grep Address
 
 > **Note:**
 >
-> command syntax: `cmd-tls-ctl [pause | resume] $POD_IP  $CONTAINER_ID`    
+> Command Usage : 
+>
+> `cmd-tls-ctl [pause | resume] $POD_IP  $CONTAINER_ID`    
+> `cmd-tls-ctl list_containers $POD_IP`      
          
 
 ### Examples
 
 The following examples assume you have:
 
-- built`kata-agent`with grcp-tls support, and
+- built`kata-agent`with grpc-tls support, and
 - created a pod runs that a container with ID `a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75`.
 
 #### Pause a running container 
 
 ```bash
-$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl pause 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
-```
+$ ./target/debug/cmd-tls-ctl pause 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
+ ```
     
 #### Resume a paused container 
 
 ```bash
-$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl resume 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
+$ ./target/debug/cmd-tls-ctl resume 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
 ```
+
+#### List containers running on the sandbox 
+```bash
+$ ./target/debug/cmd-tls-ctl listcontainers 10.89.0.18 
+```
+
+
+
