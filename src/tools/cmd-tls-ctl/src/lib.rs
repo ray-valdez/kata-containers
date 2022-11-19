@@ -24,10 +24,10 @@ impl Config {
                 } else if arg.eq("listcontainers") {
                     CmdKind::LISTCONTAINERS
                 } else {
-                    return Err("Incorrect command: [pause | resume | listcontainers]");
+                    return Err("Incorrect command: [listcontainers | pause | resume]");
                 }
             }
-            None => return Err("Missing: [pause | resume]"),
+            None => return Err("Missing: [listcontainers | pause | resume]"),
         };
 
         let address = match args.next() {
