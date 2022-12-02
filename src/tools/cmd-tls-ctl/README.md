@@ -43,7 +43,6 @@ $ ln -s ../../agent/grpc_tls_keys .
 >$ ./gen_key_cert.sh
 >$ popd
 >```
-> 
 
 ### Compile tool
 
@@ -53,7 +52,7 @@ $ make
         
 ## Run
 
-The tool currently supports container `resume` and `pause` commands. Running the tool requires specifying the IP address of the VM where the `kata-agent` runs and the ID of an executing container.
+The tool currently supports container `pause`, `resume`, and `list_containers` commands. Running the tool requires specifying the IP address of the VM where the `kata-agent` runs and the ID of an executing container.
 
 Use `crictl` to get the address of the Pod:
 
@@ -73,7 +72,7 @@ $ crictl inspectp --output table $POD_ID | grep Address
 
 The following examples assume you have:
 
-- built`kata-agent`with grpc-tls support, and
+- built `kata-agent`with grpc-tls support, and
 - created a pod runs that a container with ID `a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75`.
 
 #### Pause a running container 
