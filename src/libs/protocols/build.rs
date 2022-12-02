@@ -245,10 +245,23 @@ fn real_main() -> Result<(), std::io::Error> {
 }
 
 fn real_main_grpctls() -> Result<(), std::io::Error> {
+
     tonic_build::configure()
         .out_dir("src/grpctls")
+        .type_attribute("SecPauseContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecResumeContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("StringUser", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("Process", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Box", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("User", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxCapabilities", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")       
+        .type_attribute("POSIXRlimit", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("SecExecProcessRequest", "#[derive(serde::Deserialize, serde::Serialize)]")      
         .compile(
-            &["secprotos/secagent.proto"], &["secprotos"],
+            &["secprotos/google/protobuf/empty.proto",
+            "secprotos/secagent.proto", 
+            "secprotos/oci.proto" ], 
+            &["secprotos"],
         )?;
    Ok(())
 }

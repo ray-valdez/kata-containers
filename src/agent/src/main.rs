@@ -77,6 +77,7 @@ use tokio::{
 
 mod image_rpc;
 mod rpc;
+//mod rpctls;
 mod tracer;
 
 #[cfg(feature = "agent-policy")]
@@ -408,7 +409,7 @@ async fn start_sandbox(
     server.start().await?;
 
     // ipaddr://ip:port
-    let gserver = rpc::grpcstart(sandbox.clone(), config.server_addr.as_str())?;
+    let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str())?;
 
     gserver.await?;
 

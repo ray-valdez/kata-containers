@@ -7,16 +7,19 @@
 
 syntax = "proto3";
 
-//option go_package = "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols/grpc";
+option go_package = "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols/grpc";
+
+package  grpctls;
 
 import "oci.proto";
 
-package  grpctls;
+
 // unstable
 service SecAgentService {
 	rpc SecPauseContainer(SecPauseContainerRequest) returns (EmptyResponse);
 	rpc SecResumeContainer(SecResumeContainerRequest) returns (EmptyResponse);
 	rpc SecListContainers(SecListContainersRequest) returns(SecContainerInfoList);
+	rpc SecExecProcess(SecExecProcessRequest) returns (EmptyResponse);
 
 }
 
@@ -42,4 +45,18 @@ message SecContainerInfoList {
    repeated SecContainerInfo SecContainerInfoList = 1; 
 }
 
+message SecExecProcessRequest {
+        string container_id = 1;
+        string exec_id = 2;
+        StringUser string_user = 3;
+        Process process = 4;
+}
+
+message StringUser {
+       string uid = 1;
+       string gid = 2;
+       repeated string additionalGids = 3;
+}
+
 message EmptyResponse {}
+ 

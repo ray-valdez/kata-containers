@@ -20,7 +20,7 @@ use kata_types::mount::StorageDevice;
 use libc::pid_t;
 use oci::{ContainerState, Hook, Hooks};
 use protocols::agent::OnlineCPUMemRequest;
-use crate::rpc::grpctls::{SecContainerInfo};
+use crate::rpc::rpctls::grpctls::{SecContainerInfo};
 use regex::Regex;
 use rustjail::cgroups as rustjail_cgroups;
 use rustjail::container::BaseContainer;

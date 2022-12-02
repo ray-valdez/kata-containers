@@ -10,6 +10,8 @@ pub mod grpctls {
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
 use grpctls::{SecPauseContainerRequest, SecResumeContainerRequest, SecListContainersRequest};
 
+const SERVER_PORT: u16 = 50090; 
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new(env::args()).unwrap_or_else(|err| {
@@ -20,9 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("sandbox address: {}", config.address);
     println!("container_id:    {}", config.cid);
     let str_front = "http://";
-    let str_end = ":50051";
+    let str_end = SERVER_PORT.to_string();
 
-    let url_string = format!("{}{}{}", str_front, config.address, str_end);
+    let url_string = format!("{}{}{}{}", str_front, config.address, ":", str_end);
     println!("url_string:      {}", url_string);
 
     // Create identify from key and certificate

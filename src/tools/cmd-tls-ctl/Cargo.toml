@@ -12,7 +12,6 @@ edition = "2018"
 protocols = { path = "../../libs/protocols", features = ["with-serde"] }
 rustjail = { path = "../../agent/rustjail" }
 oci = { path = "../../libs/oci" }
-#grpctls = { path = "../../libs/protocols/src/grpctls" }
 
 clap = "2.33.0"
 lazy_static = "1.4.0"

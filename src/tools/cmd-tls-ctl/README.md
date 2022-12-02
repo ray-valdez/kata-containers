@@ -79,18 +79,18 @@ The following examples assume you have:
 #### Pause a running container 
 
 ```bash
-$ ./target/debug/cmd-tls-ctl pause 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
+$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl pause 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
  ```
     
 #### Resume a paused container 
 
 ```bash
-$ ./target/debug/cmd-tls-ctl resume 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
+$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl resume 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
 ```
 
 #### List containers running on the sandbox 
 ```bash
-$ ./target/debug/cmd-tls-ctl listcontainers 10.89.0.18 
+$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl listcontainers 10.89.0.18 
 ```
 
 
