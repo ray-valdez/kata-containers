@@ -248,6 +248,11 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
 
     tonic_build::configure()
         .out_dir("src/grpctls")
+        .type_attribute("SecCreateContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Device", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("Spec", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecStartContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecRemoveContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("SecPauseContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("SecResumeContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("StringUser", "#[derive(serde::Deserialize, serde::Serialize)]")
@@ -257,10 +262,41 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("LinuxCapabilities", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")       
         .type_attribute("POSIXRlimit", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("SecExecProcessRequest", "#[derive(serde::Deserialize, serde::Serialize)]")      
+        .type_attribute("Storage", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Windows", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Solaris", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Linux", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxIntelRdt", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxResources", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxIDMapping", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxSyscall", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxSeccomp", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxSeccompArg", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("FSGroup", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("ErrnoRet", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("oneof", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("LinuxBlockIO", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxWeightDevice", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxThrottleDevice", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxNetwork", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxInterfacePriority", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxHugepageLimit", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxMemory", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxCPU", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxPids", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxDeviceCgroup", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxNamespace", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Root", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Hooks", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Hook", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Mount", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("LinuxDevice", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .compile(
             &["secprotos/google/protobuf/empty.proto",
             "secprotos/secagent.proto", 
-            "secprotos/oci.proto" ], 
+            "secprotos/oci.proto",
+            "secprotos/types.proto",
+            "secprotos/image.proto" ], 
             &["secprotos"],
         )?;
    Ok(())

@@ -12,15 +12,45 @@ option go_package = "github.com/kata-containers/kata-containers/src/runtime/virt
 package  grpctls;
 
 import "oci.proto";
+import "types.proto";
 
 
 // unstable
 service SecAgentService {
+
+	rpc SecCreateContainer(SecCreateContainerRequest) returns (EmptyResponse);
+	rpc SecStartContainer(SecStartContainerRequest) returns (EmptyResponse);
+	rpc SecRemoveContainer(SecRemoveContainerRequest) returns (EmptyResponse);
 	rpc SecPauseContainer(SecPauseContainerRequest) returns (EmptyResponse);
 	rpc SecResumeContainer(SecResumeContainerRequest) returns (EmptyResponse);
 	rpc SecListContainers(SecListContainersRequest) returns(SecContainerInfoList);
 	rpc SecExecProcess(SecExecProcessRequest) returns (EmptyResponse);
 
+}
+
+message SecCreateContainerRequest {
+        string container_id = 1;
+        string exec_id = 2;
+        StringUser string_user = 3;
+        repeated Device devices = 4;
+        repeated Storage storages = 5;
+        Spec OCI = 6;
+
+        // This field is used to indicate if the container needs to join
+        // sandbox shared pid ns or create a new namespace. This field is
+        // meant to override the NEWPID config settings in the OCI spec.
+        // The agent would receive an OCI spec with PID namespace cleared
+        // out altogether and not just the pid ns path.
+        bool sandbox_pidns = 7;
+}
+
+message SecStartContainerRequest {
+    string container_id = 1;
+}
+
+message SecRemoveContainerRequest {
+    string container_id = 1;
+    uint32 timeout = 2;
 }
 
 message SecPauseContainerRequest {
@@ -59,4 +89,102 @@ message StringUser {
 }
 
 message EmptyResponse {}
- 
+
+// Device represents only the devices that could have been defined through the
+// Linux Device list of the OCI specification.
+message Device {
+        // Id can be used to identify the device inside the VM. Some devices
+        // might not need it to be identified on the VM, and will rely on the
+        // provided VmPath instead.
+        string id = 1;
+        // Type defines the type of device described. This can be "blk",
+        // "scsi", "vfio", ...
+        // Particularly, this should be used to trigger the use of the
+        // appropriate device handler.
+        string type = 2;
+        // VmPath can be used by the caller to provide directly the path of
+        // the device as it will appear inside the VM. For some devices, the
+        // device id or the list of options passed might not be enough to find
+        // the device. In those cases, the caller should predict and provide
+        // this vm_path.
+        string vm_path = 3;
+        // ContainerPath defines the path where the device should be found inside
+        // the container. This path should match the path of the device from
+        // the device list listed inside the OCI spec. This is used in order
+        // to identify the right device in the spec and update it with the
+        // right options such as major/minor numbers as they appear inside
+        // the VM for instance. Note that an empty ctr_path should be used
+        // to make sure the device handler inside the agent is called, but
+        // no spec update needs to be performed. This has to happen for the
+        // case of rootfs, when a device has to be waited for after it has
+        // been hotplugged. An equivalent Storage entry should be defined if
+        // any mount needs to be performed afterwards.
+        string container_path = 4;
+        // Options allows the caller to define a list of options such as block
+        // sizes, numbers of luns, ... which are very specific to every device
+        // and cannot be generalized through extra fields.
+        repeated string options = 5;
+}
+
+
+message KernelModule {
+        // This field is the name of the kernel module.
+        string name = 1;
+        // This field are the parameters for the kernel module which are
+        // whitespace-delimited key=value pairs passed to modprobe(8).
+        repeated string parameters = 2;
+}
+
+//
+// Some issues with referencing type as types.FSGroupChangePolicy
+//
+enum FSGroupChangePolicy {
+        // Always indicates that the volume ownership will always be changed.
+        Always = 0;
+        // OnRootMismatch indicates that the volume ownership will be changed only
+        // when the ownership of the root directory does not match with the expected group id for the volume.
+        OnRootMismatch = 1;
+}
+
+// FSGroup consists of the group id and group ownership change policy
+// that a volume should have its ownership changed to.
+message FSGroup {
+        // GroupID is the ID that the group ownership of the
+        // files in the mounted volume will need to be changed to.
+        uint32 group_id = 2;
+        // GroupChangePolicy specifies the policy for applying group id
+        // ownership change on a mounted volume.
+        //types.FSGroupChangePolicy group_change_policy = 3;
+        FSGroupChangePolicy group_change_policy = 3;
+}
+
+message Storage {
+        // Driver is used to define the way the storage is passed through the
+        // virtual machine. It can be "9p", "blk", or something else, but for
+        // all cases, this will define if some extra steps are required before
+        // this storage gets mounted into the container.
+        string driver = 1;
+        // DriverOptions allows the caller to define a list of options such
+        // as block sizes, numbers of luns, ... which are very specific to
+        // every device and cannot be generalized through extra fields.
+        repeated string driver_options = 2;
+        // Source can be anything representing the source of the storage. This
+        // will be handled by the proper handler based on the Driver used.
+        // For instance, it can be a very simple path if the caller knows the
+        // name of device inside the VM, or it can be some sort of identifier
+        // to let the agent find the device inside the VM.
+        string source = 3;
+        // Fstype represents the filesystem that needs to be used to mount the
+        // storage inside the VM. For instance, it could be "xfs" for block
+        // device, "9p" for shared filesystem, or "tmpfs" for shared /dev/shm.
+        string fstype = 4;
+        // Options describes the additional options that might be needed to
+        // mount properly the storage filesystem.
+        repeated string options = 5;
+        // MountPoint refers to the path where the storage should be mounted
+        // inside the VM.
+        string mount_point = 6;
+        // FSGroup consists of the group ID and group ownership change policy
+        // that the mounted volume must have its group ID changed to when specified.
+        FSGroup fs_group = 7;
+}
