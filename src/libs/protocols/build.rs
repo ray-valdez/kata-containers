@@ -248,9 +248,11 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
 
     tonic_build::configure()
         .out_dir("src/grpctls")
-        .type_attribute("SecCreateContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("SecContainerInfoList", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecContainerInfo", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecCreateContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("Device", "#[derive(serde::Deserialize, serde::Serialize)]")
-        .type_attribute("Spec", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("Spec", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("SecStartContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("SecRemoveContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("SecPauseContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
@@ -266,6 +268,9 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("Windows", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("Solaris", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("Linux", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .field_attribute("UIDMappings", "#[serde (rename = \"UIDMappings\")]")
+        .field_attribute("GIDMappings", "#[serde (rename = \"GIDMappings\")]")
+        .field_attribute("type", "#[serde (rename(serialize = \"field_type\", deserialize = \"field_type\"))]")
         .type_attribute("LinuxIntelRdt", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("LinuxResources", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("LinuxIDMapping", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
@@ -289,7 +294,7 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("Root", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("Hooks", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("Hook", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
-        .type_attribute("Mount", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("Mount", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] ")
         .type_attribute("LinuxDevice", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .compile(
             &["secprotos/google/protobuf/empty.proto",

@@ -6,16 +6,13 @@
 use tokio::sync::Mutex;
 use std::sync::Arc;
 use anyhow::{Result};
-//use protocols::image;
 
-use protocols::agent::{ 
-    CreateContainerRequest, ExecProcessRequest, RemoveContainerRequest, StartContainerRequest
-};
-
+use protocols::agent::*; 
 use crate::sandbox::Sandbox;
-use crate::image_rpc;
+use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
 use crate::image_rpc::ImageService;
 use rustjail::container::{Container};
+use protocols::image;
 
 use tonic::{
     transport::{
@@ -24,9 +21,6 @@ use tonic::{
     },
 };
 use crate::rpc::rpctls::grpctls::{SecCreateContainerRequest, SecStartContainerRequest, SecRemoveContainerRequest, SecExecProcessRequest, SecPauseContainerRequest, SecResumeContainerRequest, SecListContainersRequest, SecContainerInfoList, EmptyResponse};
-
-use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
-//use grpctls::image_server::Image;
 
 use std::net::SocketAddr;
 
@@ -53,23 +47,34 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         req: tonic::Request<SecCreateContainerRequest>,
     ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
 
-        let message = req.get_ref();
-        let jstr = match serde_json::to_string(message) {
+        info!(sl!(), "grpctls: sec_create_container, string req: {:#?}", req);
+        let mut ttrpc_req: protocols::agent::CreateContainerRequest = CreateContainerRequest::new(); 
+        let internal = req.into_inner();
+        ttrpc_req.set_container_id(internal.container_id);
+        ttrpc_req.set_exec_id(internal.exec_id);
+        ttrpc_req.set_sandbox_pidns(internal.sandbox_pidns);
+
+        let oci_obj = internal.oci.unwrap();
+        let oci_str = match serde_json::to_string(&oci_obj) {
             Ok(j) => j,
             Err(e) => return Err(tonic::Status::new(
                                 tonic::Code::Internal,
                                 format!("Unable to serialize{}", e))),
         };
-        info!(sl!(), "grpctls: do_create_container, string req: {}", jstr);
+        info!(sl!(), "grpctls: sec_create_container, string oci_str {:?}", oci_str);
 
-        let ttrpc_req: CreateContainerRequest = match serde_json::from_str(&jstr) {
-            Ok(t) => t,
+
+        let roci_spec: protocols::oci::Spec = match serde_json::from_str(&oci_str) {
+            Ok(k) => k,
             Err(e) => return Err(tonic::Status::new(
                                 tonic::Code::Internal,
                                 format!("Unable to deserialize{}", e))),
         };
-        info!(sl!(), "grpctls: do_create_container, string req: {:#?}", ttrpc_req);
 
+        info!(sl!(), "grpctls: sec_create_container oci_spec, ttrpc oci obj: {:?}", roci_spec);
+        ttrpc_req.set_OCI(roci_spec);
+
+        info!(sl!(), "grpctls: sec_create_container, ttrpc_req: {:#?}", ttrpc_req);
         match self.do_create_container(ttrpc_req).await {
             Err(e) => Err(tonic::Status::new(
                                 tonic::Code::Internal,
@@ -77,7 +82,6 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
             Ok(_) =>Ok(tonic::Response::new(EmptyResponse{})),
 
         }
-        
     }
 
     async fn sec_exec_process(
@@ -238,7 +242,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                                 tonic::Code::Internal,
                                 format!("Unable to deserialize{}", e))),
         };
-        info!(sl!(), "grpctls: do_remove_container, string req: {:#?}", ttrpc_req);
+        info!(sl!(), "grpctls: do_start_container, string req: {:?}", ttrpc_req);
 
         match self.do_start_container(ttrpc_req).await {
             Err(e) => Err(tonic::Status::new(
@@ -274,30 +278,34 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
 impl grpctls::image_server::Image for ImageService {
     async fn pull_image(
         &self,
-        _req: tonic::Request<PullImageRequest>,
+        req: tonic::Request<PullImageRequest>,
     ) -> Result<tonic::Response<PullImageResponse>, tonic::Status> {
 
-         Err(tonic::Status::new(
+        let mut nreq = image::PullImageRequest::default();
+        let internal = req.into_inner();
+
+        nreq.set_image(internal.image);
+        nreq.set_container_id(internal.container_id);
+        nreq.set_source_creds(internal.source_creds);
+       
+        Err(tonic::Status::new(
             tonic::Code::Internal,
-           format!("Not implemented: pull image !")))
-    }
+           format!("Not implemented: pull image {:?} !", nreq)))
+
+  }
 }
 
-pub fn grpcstart(s: Arc<Mutex<Sandbox>>,server_address: &str) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
+
+pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
 
     let sec_agent = AgentService { sandbox: s.clone() };
-    let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);
+    let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);    
 
-    let image_service = image_rpc::ImageService::new(s);
-
-    //let iservice = <dyn grpctls::image_server::Image>::new(image_service);
-    //let iservice = grpctls::image_server::ImageServer::<image_rpc::ImageService>::new(image_service);
+    let image_service = ImageService::new(s);
     let iservice = grpctls::image_server::ImageServer::new(image_service);
-    
-    //let addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
-    //let addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
-    //
+
     let addr = SocketAddr::from(([0, 0, 0, 0], GRPC_TLS_SERVER_PORT));
+
     // Config TLS
     let cert = include_str!("../../grpc_tls_keys/server.pem");
     let key = include_str!("../../grpc_tls_keys/server.key");

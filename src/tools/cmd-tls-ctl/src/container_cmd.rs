@@ -1,6 +1,7 @@
 use cmd_tls_ctl::{Config, CmdKind};
 use std::env;
 use std::process;
+//use serde_json::json;
 
 use tonic;
 pub mod grpctls {
@@ -53,7 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let request = tonic::Request::new(SecListContainersRequest {
             });
             let response = client.sec_list_containers(request).await?.into_inner();
-            println!("RESPONSE={:?}", response);
+            //println!("RESPONSE={:?}", response);
+            println!("{}", serde_json::to_string_pretty(&response).unwrap())
         }
 
         CmdKind::PAUSE => {
