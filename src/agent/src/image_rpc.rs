@@ -356,6 +356,39 @@ impl protocols::image_ttrpc_async::Image for ImageService {
     }
 }
 
+#[tonic::async_trait]
+impl grpctls::image_server::Image for ImageService {
+    async fn pull_image(
+        &self,
+        req: tonic::Request<PullImageRequest>,
+    ) -> Result<tonic::Response<PullImageResponse>, tonic::Status> {
+
+        let mut nreq = image::PullImageRequest::default();
+        let internal = req.into_inner();
+
+        nreq.set_image(internal.image);
+        nreq.set_container_id(internal.container_id);
+        nreq.set_source_creds(internal.source_creds);
+        /*
+        Err(tonic::Status::new(
+            tonic::Code::Internal,
+           format!("Not implemented: pull image {:?} !", nreq)))
+        */
+
+         match self.pull_image(&nreq).await {
+            Ok(_) => {
+                Ok(tonic::Response::new(PullImageResponse{image_ref:"hello".to_string()}))
+
+            }
+            Err(e) => Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("{}", e))),
+        }
+
+
+  }
+}
+
 #[cfg(test)]
 mod tests {
     use super::ImageService;

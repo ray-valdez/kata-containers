@@ -9,10 +9,8 @@ use anyhow::{Result};
 
 use protocols::agent::*; 
 use crate::sandbox::Sandbox;
-use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
 use crate::image_rpc::ImageService;
 use rustjail::container::{Container};
-use protocols::image;
 
 use tonic::{
     transport::{
@@ -273,28 +271,6 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
 
     }
 }
-
-#[tonic::async_trait]
-impl grpctls::image_server::Image for ImageService {
-    async fn pull_image(
-        &self,
-        req: tonic::Request<PullImageRequest>,
-    ) -> Result<tonic::Response<PullImageResponse>, tonic::Status> {
-
-        let mut nreq = image::PullImageRequest::default();
-        let internal = req.into_inner();
-
-        nreq.set_image(internal.image);
-        nreq.set_container_id(internal.container_id);
-        nreq.set_source_creds(internal.source_creds);
-       
-        Err(tonic::Status::new(
-            tonic::Code::Internal,
-           format!("Not implemented: pull image {:?} !", nreq)))
-
-  }
-}
-
 
 pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
 
