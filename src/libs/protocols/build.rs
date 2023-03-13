@@ -298,7 +298,8 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("LinuxDevice", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .compile(
             &["secprotos/google/protobuf/empty.proto",
-            "secprotos/secagent.proto", 
+            "secprotos/secagent.proto",
+            "secprotos/secgetresource.proto",
             "secprotos/oci.proto",
             "secprotos/types.proto",
             "secprotos/image.proto" ], 

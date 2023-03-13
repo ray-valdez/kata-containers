@@ -31,6 +31,7 @@ url = "2.2.2"
 derivative = "2.2.0"
 prost = "0.10"
 tonic = {version="0.7", features = ["tls"]}
+zip = "0.5.4"
 
 # Async helpers
 async-trait = "0.1.42"

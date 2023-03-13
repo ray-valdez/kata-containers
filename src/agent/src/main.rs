@@ -78,6 +78,8 @@ use tokio::{
 mod image_rpc;
 mod rpc;
 //mod rpctls;
+mod secrets;
+mod aagent;
 mod tracer;
 
 #[cfg(feature = "agent-policy")]
@@ -408,10 +410,22 @@ async fn start_sandbox(
     let mut server = rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
     server.start().await?;
 
-    // ipaddr://ip:port
-    let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str())?;
+    // obtaining a lock for the attestation agent and starting the agent if not started
+    let aa_init = aa_instance.lock().await;
+    aa_init.start_attestation_agent().await?;
+    
+    // downloading and extracting the tls keys for the grpctls server
+    secrets::retrieve_secrets().await?;
+    
+    // unlocking the attestation agent
+    drop(aa_init);
 
-    gserver.await?;
+    // if the tls keys are downloaded and extracted, then start the grpctls server
+    if secrets::tls_keys_exist() {
+        // ipaddr://ip:port
+        let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), aa_instance.clone())?;
+        gserver.await?;
+    }
 
     rx.await?;
     server.shutdown().await?;

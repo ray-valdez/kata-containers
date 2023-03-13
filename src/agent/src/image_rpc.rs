@@ -25,6 +25,11 @@ use crate::AGENT_CONFIG;
 // A marker to merge container spec for images pulled inside guest.
 const ANNO_K8S_IMAGE_NAME: &str = "io.kubernetes.cri.image-name";
 
+use image_rs::image::ImageClient;
+
+use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
+use crate::rpc::rpctls::grpctls;
+
 // kata rootfs is readonly, use tmpfs before CC storage is implemented.
 const KATA_CC_IMAGE_WORK_DIR: &str = "/run/image/";
 const KATA_CC_PAUSE_BUNDLE: &str = "/pause_bundle";

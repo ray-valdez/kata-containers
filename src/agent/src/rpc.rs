@@ -98,6 +98,7 @@ use std::path::PathBuf;
 use crate::cdh::CDHClient;
 
 pub mod rpctls;
+use crate::aagent::AttestationService;
 
 pub const CONTAINER_BASE: &str = "/run/kata-containers";
 const MODPROBE_PATH: &str = "/sbin/modprobe";

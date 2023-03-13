@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use std::fs;
 use tokio::sync::Mutex;
 use std::sync::Arc;
-use anyhow::{Result};
+use anyhow::{anyhow, Result};
 
 use protocols::agent::*; 
 use crate::sandbox::Sandbox;
@@ -23,6 +24,8 @@ use crate::rpc::rpctls::grpctls::{SecCreateContainerRequest, SecStartContainerRe
 use std::net::SocketAddr;
 
 use super::AgentService;
+
+use crate::aagent::AttestationService;
 
 pub mod grpctls {
     tonic::include_proto!("grpctls");
@@ -272,25 +275,33 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
     }
 }
 
-pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
+fn from_file(file_path: &str) -> Result<String> {
+    let file_content = fs::read_to_string(file_path)
+        .map_err(|e| anyhow!("Read {:?} file failed: {:?}", file_path, e))?;
+
+    Ok(file_content)
+}
+
+pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, 
+    aa_service: Arc<Mutex<AttestationService>>) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
 
     let sec_agent = AgentService { sandbox: s.clone() };
     let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);    
 
-    let image_service = ImageService::new(s);
+    let image_service = ImageService::new(s, aa_service);
     let iservice = grpctls::image_server::ImageServer::new(image_service);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], GRPC_TLS_SERVER_PORT));
 
     // Config TLS
-    let cert = include_str!("../../grpc_tls_keys/server.pem");
-    let key = include_str!("../../grpc_tls_keys/server.key");
+    let cert = from_file("/run/tls-keys/server.pem")?;
+    let key = from_file("/run/tls-keys/server.key")?;
 
     // create identity from cert and key
     let id = tonic::transport::Identity::from_pem(cert.as_bytes(), key.as_bytes());
 
     // Reading ca root from disk
-    let pem = include_str!("../../grpc_tls_keys/ca.pem");
+    let pem = from_file("/run/tls-keys/ca.pem")?;
 
     // Create certificate
     let ca = tonic::transport::Certificate::from_pem(pem.as_bytes());
