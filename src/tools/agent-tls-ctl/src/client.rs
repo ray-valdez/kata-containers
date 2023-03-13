@@ -479,18 +479,14 @@ async fn client_create_tls_channel<'a>(
     let url_string = format!("{}{}:{}", str_front, server_address, server_port);
     println!("url_string {}", url_string);
 
-    //  Get certificate from disk
-    let cert = include_str!("../grpc_tls_keys/client.pem");
-    let key = include_str!("../grpc_tls_keys/client.key");
+    // Create identify from key and certificate
+    let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
+    let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
+    let id = tonic::transport::Identity::from_pem(cert, key);
 
-    // create identify from key and certificate
-    let id = tonic::transport::Identity::from_pem(cert.as_bytes(), key.as_bytes());
-
-    // import our certificate for CA
-    let s = include_str!("../grpc_tls_keys/ca.pem");
-
-    // converting it into a certificate
-    let ca = tonic::transport::Certificate::from_pem(s.as_bytes());
+    // Get CA certificate 
+    let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
+    let ca = tonic::transport::Certificate::from_pem(pem);
 
     // Telling our client what is the identity of our server
     let tls = tonic::transport::ClientTlsConfig::new()
@@ -555,18 +551,14 @@ async fn image_create_tls_channel<'a>(
     let url_string = format!("{}{}:{}", str_front, server_address, server_port);
     println!("url_string {}", url_string);
 
-    //  Get certificate from disk
-    let cert = include_str!("../grpc_tls_keys/client.pem");
-    let key = include_str!("../grpc_tls_keys/client.key");
+    // Create identify from key and certificate
+    let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
+    let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
+    let id = tonic::transport::Identity::from_pem(cert, key);
 
-    // create identify from key and certificate
-    let id = tonic::transport::Identity::from_pem(cert.as_bytes(), key.as_bytes());
-
-    // import our certificate for CA
-    let s = include_str!("../grpc_tls_keys/ca.pem");
-
-    // converting it into a certificate
-    let ca = tonic::transport::Certificate::from_pem(s.as_bytes());
+    // Get CA certificate 
+    let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
+    let ca = tonic::transport::Certificate::from_pem(pem);
 
     // Telling our client what is the identity of our server
     let tls = tonic::transport::ClientTlsConfig::new()
