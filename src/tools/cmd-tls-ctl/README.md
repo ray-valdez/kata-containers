@@ -64,32 +64,33 @@ $ crictl inspectp --output table $POD_ID | grep Address
 >
 > Command Usage : 
 >
-> `cmd-tls-ctl [pause | resume] $POD_IP  $CONTAINER_ID`    
-> `cmd-tls-ctl list_containers $POD_IP`      
+> `cmd-tls-ctl <CLIENT_TLS_KEY_PATH> <pause | resume> $POD_IP  $CONTAINER_ID`    
+> `cmd-tls-ctl <CLIENT_TLS_KEY_PATH> list_containers $POD_IP`      
          
 
 ### Examples
 
 The following examples assume you have:
 
+- generated TLS keys in `$KATA_DIR/src/agent/grpc_tls_keys` directory, expecting to find the following files: `ca.pem`, `client.pem`, and `client.key`
 - built `kata-agent`with grpc-tls support, and
 - created a pod runs that a container with ID `a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75`.
 
 #### Pause a running container 
 
 ```bash
-$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl pause 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
+$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl ./grpc_tls_keys pause 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
  ```
     
 #### Resume a paused container 
 
 ```bash
-$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl resume 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
+$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl ./grpc_tls_keys resume 10.89.0.18 a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75
 ```
 
 #### List containers running on the sandbox 
 ```bash
-$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl listcontainers 10.89.0.18 
+$ ./target/x86_64-unknown-linux-musl/release/cmd-tls-ctl ./grpc_tls_keys listcontainers 10.89.0.18 
 ```
 
 
