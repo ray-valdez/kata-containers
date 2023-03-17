@@ -1,6 +1,7 @@
 use cmd_tls_ctl::{Config, CmdKind};
 use std::env;
 use std::process;
+use std::path::{PathBuf};
 //use serde_json::json;
 
 use tonic;
@@ -16,7 +17,7 @@ const SERVER_PORT: u16 = 50090;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new(env::args()).unwrap_or_else(|err| {
-        eprintln!("Problem parsing arguments: {}", err);
+        eprintln!("{}", err);
         process::exit(1);
     });
 
@@ -26,15 +27,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let str_end = SERVER_PORT.to_string();
 
     let url_string = format!("{}{}{}{}", str_front, config.address, ":", str_end);
-    println!("url_string:      {}", url_string);
+
+    let mut client_cert = PathBuf::from(&config.key_path);
+    let mut client_key = PathBuf::from(&config.key_path);
+    let mut ca_cert = PathBuf::from(&config.key_path);
+    client_cert.push("client.pem");
+    client_key.push("client.key");
+    ca_cert.push("ca.pem");
+
+    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
 
     // Create identify from key and certificate
-    let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
-    let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
+    let cert = tokio::fs::read(client_cert).await?;
+    let key = tokio::fs::read(client_key).await?;
     let id = tonic::transport::Identity::from_pem(cert, key);
 
     // Get CA certificate 
-    let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
+    let pem = tokio::fs::read(ca_cert).await?;
     let ca = tonic::transport::Certificate::from_pem(pem);
 
     // Tell our client what is the identity of our server
