@@ -44,6 +44,7 @@ const WARNING_TEXT: &str = r#"WARNING:
 const DEFAULT_KATA_AGENT_API_VSOCK_PORT: &str = "1024";
 
 fn make_examples_text(program_name: &str) -> String {
+    let key_dir = "$key_dir";
     let abstract_server_address = "unix://@/foo/bar/abstract.socket";
     let bundle = "$bundle_dir";
     let config_file_uri = "file:///tmp/config.json";
@@ -117,8 +118,9 @@ fn make_examples_text(program_name: &str) -> String {
 
 - Create a Container using a custom configuration file:
 
-  $ {program} connect --server-address "{vsock_server_address}" --bundle-dir {bundle:?} --cmd 'CreateContainer spec={config_file_uri}'
+  $ {program} connect --key-path "{key_dir}" --server-address "{vsock_server_address}" --bundle-dir {bundle:?} --cmd 'CreateContainer spec={config_file_uri}'
 	"#,
+        key_dir = key_dir,
         abstract_server_address = abstract_server_address,
         bundle = bundle,
         config_file_uri = config_file_uri,
@@ -166,6 +168,9 @@ async fn connect(name: &str, global_args: clap::ArgMatches<'_>) -> Result<()> {
         Some(t) => utils::human_time_to_ns(t).map_err(|e| e)?,
         None => 0,
     };
+    let key_dir = args
+        .value_of("key-dir")
+        .ok_or_else(|| anyhow!("Need client key-dir"))?;
 
     let hybrid_vsock_port = args
         .value_of("hybrid-vsock-port")
@@ -179,6 +184,7 @@ async fn connect(name: &str, global_args: clap::ArgMatches<'_>) -> Result<()> {
     let no_auto_values = args.is_present("no-auto-values");
 
     let cfg = Config {
+        key_dir: key_dir.to_string(),
         server_address,
         bundle_dir,
         interactive,
@@ -221,6 +227,12 @@ async fn real_main() -> Result<()> {
             SubCommand::with_name("connect")
                 .about("Connect to agent")
                 .after_help(WARNING_TEXT)
+                .arg(
+                    Arg::with_name("key-dir")
+                    .long("key-dir")
+                    .takes_value(true)
+                    .help("Client TLS key directory"),
+                    )
                 .arg(
                     Arg::with_name("bundle-dir")
                     .long("bundle-dir")

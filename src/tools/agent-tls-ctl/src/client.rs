@@ -13,6 +13,7 @@ use slog::{debug, info};
 use std::io;
 use std::io::Write; // XXX: for flush()
 use std::io::{BufRead, BufReader};
+use std::path::{PathBuf};
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
 use std::thread::sleep;
@@ -471,6 +472,7 @@ fn setup_hybrid_vsock(mut stream: &UnixStream, hybrid_vsock_port: u64) -> Result
 }
 
 async fn client_create_tls_channel<'a>(
+    key_dir: String,
     server_address: &'a str,
     server_port: &'a str,
 ) -> Result<SecAgentServiceClient<tonic::transport::Channel>> {
@@ -479,6 +481,27 @@ async fn client_create_tls_channel<'a>(
     let url_string = format!("{}{}:{}", str_front, server_address, server_port);
     println!("url_string {}", url_string);
 
+    let mut client_cert = PathBuf::from(&key_dir);
+    let mut client_key = PathBuf::from(&key_dir);
+    let mut ca_cert = PathBuf::from(&key_dir);
+    client_cert.push("client.pem");
+    client_key.push("client.key");
+    ca_cert.push("ca.pem");
+
+    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
+
+    // Create identify from key and certificate
+    let cert = tokio::fs::read(client_cert).await?;
+    let key = tokio::fs::read(client_key).await?;
+    let id = tonic::transport::Identity::from_pem(cert, key);
+
+    // Get CA certificate
+    let pem = tokio::fs::read(ca_cert).await?;
+    let ca = tonic::transport::Certificate::from_pem(pem);
+
+    /*
     // Create identify from key and certificate
     let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
     let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
@@ -487,6 +510,7 @@ async fn client_create_tls_channel<'a>(
     // Get CA certificate 
     let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
     let ca = tonic::transport::Certificate::from_pem(pem);
+    */
 
     // Telling our client what is the identity of our server
     let tls = tonic::transport::ClientTlsConfig::new()
@@ -503,6 +527,7 @@ async fn client_create_tls_channel<'a>(
 }
 
 async fn create_grpctls_client(
+    key_dir: String,
     server_address: String,
     _hybrid_vsock_port: u64,
     _hybrid_vsock: bool,
@@ -514,7 +539,6 @@ async fn create_grpctls_client(
     }
 
     let scheme = fields[0].to_lowercase();
-    println!(" print scheme {}", scheme.as_str());
 
     match scheme.as_str() {
         // Format: "ipaddr://ip:port"
@@ -530,9 +554,8 @@ async fn create_grpctls_client(
                     return Err(anyhow!(e).context("IPADDR port is not numeric"));
                 }
             };
-            println!("ipaddr {} {}", ip_address, port);
 
-            let channel = client_create_tls_channel(&ip_address, &port.to_string()).await?;
+            let channel = client_create_tls_channel(key_dir, &ip_address, &port.to_string()).await?;
             Ok(channel)
         }
         _ => return Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
@@ -543,6 +566,7 @@ async fn create_grpctls_client(
 // Todo: must refactor using generic fn type!
 //
 async fn image_create_tls_channel<'a>(
+    key_dir: String,
     server_address: &'a str,
     server_port: &'a str,
 ) -> Result<ImageClient<tonic::transport::Channel>> {
@@ -551,6 +575,27 @@ async fn image_create_tls_channel<'a>(
     let url_string = format!("{}{}:{}", str_front, server_address, server_port);
     println!("url_string {}", url_string);
 
+    let mut client_cert = PathBuf::from(&key_dir);
+    let mut client_key = PathBuf::from(&key_dir);
+    let mut ca_cert = PathBuf::from(&key_dir);
+    client_cert.push("client.pem");
+    client_key.push("client.key");
+    ca_cert.push("ca.pem");
+
+    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
+
+    // Create identify from key and certificate
+    let cert = tokio::fs::read(client_cert).await?;
+    let key = tokio::fs::read(client_key).await?;
+    let id = tonic::transport::Identity::from_pem(cert, key);
+
+    // Get CA certificate
+    let pem = tokio::fs::read(ca_cert).await?;
+    let ca = tonic::transport::Certificate::from_pem(pem);
+
+    /* 
     // Create identify from key and certificate
     let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
     let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
@@ -559,6 +604,7 @@ async fn image_create_tls_channel<'a>(
     // Get CA certificate 
     let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
     let ca = tonic::transport::Certificate::from_pem(pem);
+    */
 
     // Telling our client what is the identity of our server
     let tls = tonic::transport::ClientTlsConfig::new()
@@ -574,6 +620,7 @@ async fn image_create_tls_channel<'a>(
 }
 
 async fn create_grpctls_image(
+    key_dir: String,
     server_address: String,
     _hybrid_vsock_port: u64,
     _hybrid_vsock: bool,
@@ -585,7 +632,6 @@ async fn create_grpctls_image(
     }
 
     let scheme = fields[0].to_lowercase();
-    println!(" print scheme {}", scheme.as_str());
 
     match scheme.as_str() {
         // Format: "ipaddr://ip:port"
@@ -601,9 +647,8 @@ async fn create_grpctls_image(
                     return Err(anyhow!(e).context("IPADDR port is not numeric"));
                 }
             };
-            println!("ipaddr {} {}", ip_address, port);
 
-            let channel = image_create_tls_channel(&ip_address, &port.to_string()).await?;
+            let channel = image_create_tls_channel(key_dir, &ip_address, &port.to_string()).await?;
             Ok(channel)
         }
         _ => return Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
@@ -611,22 +656,24 @@ async fn create_grpctls_image(
 }
 
 async fn kata_service_agent(
+    key_dir: String,
     server_address: String,
     hybrid_vsock_port: u64,
     hybrid_vsock: bool,
 ) -> Result<(SecAgentServiceClient<tonic::transport::Channel>, i32)> {
     let grpc_channel =
-        create_grpctls_client(server_address, hybrid_vsock_port, hybrid_vsock).await?;
+        create_grpctls_client(key_dir, server_address, hybrid_vsock_port, hybrid_vsock).await?;
     Ok((grpc_channel, 2))
 }
 
 async fn kata_service_image(
+    key_dir: String,
     server_address: String,
     hybrid_vsock_port: u64,
     hybrid_vsock: bool,
 ) -> Result<(ImageClient<tonic::transport::Channel>, i32)> {
     let grpc_channel =
-        create_grpctls_image(server_address, hybrid_vsock_port, hybrid_vsock).await?;
+        create_grpctls_image(key_dir, server_address, hybrid_vsock_port, hybrid_vsock).await?;
     Ok((grpc_channel, 3))
 }
 
@@ -671,6 +718,7 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
     announce(cfg);
 
     let (client, _val) = match kata_service_agent(
+        cfg.key_dir.clone(),
         cfg.server_address.clone(),
         cfg.hybrid_vsock_port,
         cfg.hybrid_vsock,
@@ -682,6 +730,7 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
     };
 
     let (image, _val) = match kata_service_image(
+        cfg.key_dir.clone(),
         cfg.server_address.clone(),
         cfg.hybrid_vsock_port,
         cfg.hybrid_vsock,
