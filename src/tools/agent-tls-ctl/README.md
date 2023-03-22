@@ -46,7 +46,7 @@ The method used to connect to Kata Containers agent is TCP/IP.
 
    ```sh
 	$ crictl inspectp --output table $POD_ID | grep Address
-   # or
+    # or
 	$ crictl -r "unix://${CONTAINERD_SOCK}" inspectp --output table ${POD_ID} | grep Address
   ```
 
@@ -65,14 +65,14 @@ The method used to connect to Kata Containers agent is TCP/IP.
 ### QEMU examples
 
 The following examples assume you have:
-- Installed bundle, and set the `bundle_dir` environmental variable,
+- Created an OCI bundle, and set the `bundle_dir` environmental variable,
 - Set TLS keys environmental variable, `key_dir`,  
 - Built `kata-agent` with grpc-tls support, 
-- Created a pod runs, returning POD ID a1fd4b9e93af1fab760edc706eaa1fad339125efaabcf95846fea1b10ae0ff75.
-- Retrieved guest_address, e.g., `10.89.0.28`, and set environmental variables according 
+- Created a pod, and retrieved pod addreess, i.e, guest_address, and set environmental variables accordingly 
    ```sh
    export guest_addr=10.89.0.28
    export guest_port=50090
+   export ctl=./target/x86_64-unknown-linux-musl/release/kata-agent-tls-ctl
    ```
 
 
@@ -80,7 +80,9 @@ The following examples assume you have:
 Pull the image `ghcr.io/ray-valdez/alpine`
 
 ```bash
-${ctl} -l trace connect --key-dir "${key_dir}" --bundle-dir "${bundle_dir}" --server-address "ipaddr://${guest_addr}:${guest_port}" -c "PullImage cid=${container_id} image="ghcr.io/ray-valdez/alpine”
+image=ghcr.io/ray-valdez/alpine
+
+${ctl} -l trace connect --key-dir "${key_dir}" --bundle-dir "${bundle_dir}" --server-address "ipaddr://${guest_addr}:${guest_port}" -c "PullImage cid=${container_id} image=${image}”
 ```
 
 #### Create a container
@@ -88,9 +90,8 @@ Specify a uuid as container ID and use the sample OCI config file in the directo
 
 ```bash
 # randomly generate container 
-export container_id=9e3d1d4750e4e20945d22c358e13c85c6b88922513bce2832c0cf403f065dc6
-
-export OCI_SPEC_CONFIG=${KATA_DIR}/src/tools/agent-tls-ctl/config.json
+container_id=9e3d1d4750e4e20945d22c358e13c85c6b88922513bce2832c0cf403f065dc6
+OCI_SPEC_CONFIG=${KATA_DIR}/src/tools/agent-tls-ctl/config.json
 
 ${ctl} -l trace connect --key-dir "${key_dir}" --bundle-dir "${bundle_dir}" --server-address "ipaddr://${guest_addr}:${guest_port}" -c "CreateContainer cid=${container_id} spec=file:///${OCI_SPEC_CONFIG}"
 ```

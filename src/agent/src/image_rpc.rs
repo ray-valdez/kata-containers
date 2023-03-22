@@ -374,16 +374,10 @@ impl grpctls::image_server::Image for ImageService {
         nreq.set_image(internal.image);
         nreq.set_container_id(internal.container_id);
         nreq.set_source_creds(internal.source_creds);
-        /*
-        Err(tonic::Status::new(
-            tonic::Code::Internal,
-           format!("Not implemented: pull image {:?} !", nreq)))
-        */
 
          match self.pull_image(&nreq).await {
-            Ok(_) => {
-                Ok(tonic::Response::new(PullImageResponse{image_ref:"hello".to_string()}))
-
+            Ok(r) => {
+                Ok(tonic::Response::new(PullImageResponse{image_ref:r}))
             }
             Err(e) => Err(tonic::Status::new(
                                 tonic::Code::Internal,

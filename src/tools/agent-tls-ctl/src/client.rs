@@ -30,7 +30,7 @@ use grpctls::sec_agent_service_client::SecAgentServiceClient;
 use grpctls::{
     PullImageRequest, SecCreateContainerRequest, SecExecProcessRequest, SecListContainersRequest,
     SecPauseContainerRequest, SecRemoveContainerRequest, SecResumeContainerRequest,
-    SecStartContainerRequest,
+    SecStartContainerRequest, SecSignalProcessRequest, SecWaitProcessRequest
 };
 
 macro_rules! run_if_auto_values {
@@ -116,7 +116,7 @@ const SHUTDOWN_CMD: &str = "DestroySandbox";
 const CMD_QUIT: &str = "quit";
 const CMD_REPEAT: &str = "repeat";
 
-//const DEFAULT_PROC_SIGNAL: &str = "SIGKILL";
+const DEFAULT_PROC_SIGNAL: &str = "SIGKILL";
 
 //const ERR_API_FAILED: &str = "API failed";
 
@@ -257,17 +257,11 @@ static AGENT_CMDS: &[AgentCmd] = &[
         st: ServiceType::Agent,
         fp: agent_cmd_sandbox_set_ip_tables,
     },
+    */
     AgentCmd {
         name: "SignalProcess",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_signal_process,
     },
-    AgentCmd {
-        name: "StartContainer",
-        st: ServiceType::Agent,
-        fp: agent_cmd_container_start,
-    },
-    */
     AgentCmd {
         name: "StartContainer",
         st: ServiceType::Agent,
@@ -283,11 +277,12 @@ static AGENT_CMDS: &[AgentCmd] = &[
         st: ServiceType::Agent,
         fp: agent_cmd_sandbox_update_container,
     },
+    */
     AgentCmd {
         name: "WaitProcess",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_wait_process,
     },
+    /*
     AgentCmd {
         name: "WriteStdin",
         st: ServiceType::Agent,
@@ -1016,6 +1011,14 @@ async fn handle_agent_cmd(
                 agent_cmd_container_exec(ctx, client, health, image, options, args).await?;
         }
 
+        "SignalProcess" => {
+            let _result = agent_cmd_container_signal_process(ctx, client, health, image, options, args).await?;
+        }
+
+        "WaitProcess" => {
+            let _result = agent_cmd_container_wait_process(ctx, client, health, image, options, args).await?;
+        }
+
         "PullImage" => {
             let _result = agent_cmd_pull_image(ctx, client, health, image, options, args).await?;
         }
@@ -1184,7 +1187,7 @@ async fn agent_cmd_container_create(
 
         Ok(())
     });
-    let send = match utils::get_option("send", options, args) {
+    let nsend = match utils::get_option("nsend", options, args) {
         Ok(v) => {
             if v.len() == 0 {
                 false
@@ -1194,10 +1197,10 @@ async fn agent_cmd_container_create(
         }
         Err(_) => false,
     };
-    debug!(sl!(), "Boolean"; "send request" => format!("{:?}", send));
+    debug!(sl!(), "Boolean"; "send request" => format!("{:?}", nsend));
     debug!(sl!(), "Request"; "tls rpc request" => format!("{:?}", req));
 
-    if send {
+    if !nsend {
         let reply = client.sec_create_container(req).await?.into_inner();
 
         info!(sl!(), "response received";
@@ -1375,7 +1378,7 @@ async fn agent_cmd_container_pause(
         Ok(())
     });
 
-    debug!(sl!(), "sending request"; "1. RV request" => format!("{:?}", req));
+    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
     let reply = client.sec_pause_container(req).await?.into_inner();
 
@@ -1406,7 +1409,6 @@ async fn agent_cmd_container_resume(
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
     let reply = client.sec_resume_container(req).await?.into_inner();
-    println!("REPLY={:?}", reply);
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1500,16 +1502,16 @@ fn agent_cmd_sandbox_get_ip_tables(
 
     Ok(())
 }
-
-fn agent_cmd_container_wait_process(
+*/
+async fn agent_cmd_container_wait_process(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: i32,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: WaitProcessRequest = utils::make_request(args)?;
+    let mut req: SecWaitProcessRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1517,32 +1519,37 @@ fn agent_cmd_container_wait_process(
         let cid = utils::get_option("cid", options, args)?;
         let exec_id = utils::get_option("exec_id", options, args)?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
+        req.container_id = cid;
+        req.exec_id = exec_id;
 
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
+    let reply = client.sec_wait_process(req).await?.into_inner();
 
+    info!(sl!(), "response received";
+        "response" => format!("{:?}", reply));
+/*
     let reply = client
         .wait_process(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
-
+*/
     Ok(())
 }
 
-fn agent_cmd_container_signal_process(
+async fn agent_cmd_container_signal_process(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: i32,
+    _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SignalProcessRequest = utils::make_request(args)?;
+    let mut req: SecSignalProcessRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1559,25 +1566,32 @@ fn agent_cmd_container_signal_process(
 
         let signum = utils::signame_to_signum(&sigstr).map_err(|e| anyhow!(e))?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
-        req.set_signal(signum as u32);
+        req.container_id = cid;
+        req.exec_id = exec_id;
+        req.signal = signum as u32;
 
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.sec_signal_process(req).await?.into_inner();
+
+    info!(sl!(), "response received";
+        "response" => format!("{:?}", reply));
+    /*
     let reply = client
         .signal_process(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
+        */
 
     Ok(())
 }
 
+/*
 fn agent_cmd_sandbox_list_interfaces(
     ctx: &Context,
     client: &AgentServiceClient,
@@ -2255,20 +2269,19 @@ async fn agent_cmd_pull_image(
     };
     // debug!(sl!(), "PullImage"; "request" => format!("{:?}", req));
 
-    let send = match utils::get_option("send", options, args) {
+    let nsend = match utils::get_option("nsend", options, args) {
         Ok(v) => {
             if v.len() == 0 {
-                false
+               false 
             } else {
-                true
+                true 
             }
         }
         Err(_) => false,
     };
+    debug!(sl!(), "PullImage"; "request" => format!("{:?}", nsend));
 
-    debug!(sl!(), "PullImage"; "request" => format!("{:?}", send));
-
-    if send {
+    if !nsend {
         let reply = image_client.pull_image(req).await?.into_inner();
 
         info!(sl!(), "response received";

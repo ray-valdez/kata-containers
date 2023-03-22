@@ -251,6 +251,8 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("SecContainerInfoList", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("SecContainerInfo", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("SecCreateContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecSignalProcessRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("SecWaitProcessRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("Device", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("Spec", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("SecStartContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")

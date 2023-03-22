@@ -14,17 +14,23 @@ package  grpctls;
 import "oci.proto";
 import "types.proto";
 
+import "google/protobuf/empty.proto";
 
 // unstable
 service SecAgentService {
+	// execution
+	rpc SecCreateContainer(SecCreateContainerRequest) returns (google.protobuf.Empty);
+	rpc SecStartContainer(SecStartContainerRequest) returns (google.protobuf.Empty);
 
-	rpc SecCreateContainer(SecCreateContainerRequest) returns (EmptyResponse);
-	rpc SecStartContainer(SecStartContainerRequest) returns (EmptyResponse);
-	rpc SecRemoveContainer(SecRemoveContainerRequest) returns (EmptyResponse);
-	rpc SecPauseContainer(SecPauseContainerRequest) returns (EmptyResponse);
-	rpc SecResumeContainer(SecResumeContainerRequest) returns (EmptyResponse);
+	rpc SecRemoveContainer(SecRemoveContainerRequest) returns (google.protobuf.Empty);
+	rpc SecExecProcess(SecExecProcessRequest) returns (google.protobuf.Empty);
+        rpc SecSignalProcess(SecSignalProcessRequest) returns (google.protobuf.Empty);
+	rpc SecWaitProcess(SecWaitProcessRequest) returns (SecWaitProcessResponse); 
+
+	rpc SecPauseContainer(SecPauseContainerRequest) returns (google.protobuf.Empty);
+	rpc SecResumeContainer(SecResumeContainerRequest) returns (google.protobuf.Empty);
+	// new api 
 	rpc SecListContainers(SecListContainersRequest) returns(SecContainerInfoList);
-	rpc SecExecProcess(SecExecProcessRequest) returns (EmptyResponse);
 
 }
 
@@ -82,13 +88,30 @@ message SecExecProcessRequest {
         Process process = 4;
 }
 
+message SecSignalProcessRequest {
+	string container_id = 1;
+
+	// Special case for SignalProcess(): exec_id can be empty(""),
+	// which means to send the signal to all the processes including their descendants.
+	// Other APIs with exec_id should treat empty exec_id as an invalid request.
+	string exec_id = 2;
+	uint32 signal = 3;
+}
+
+message SecWaitProcessRequest {
+	string container_id = 1;
+	string exec_id = 2;
+}
+
+message SecWaitProcessResponse {
+	int32 status = 1;
+}
+
 message StringUser {
        string uid = 1;
        string gid = 2;
        repeated string additionalGids = 3;
 }
-
-message EmptyResponse {}
 
 // Device represents only the devices that could have been defined through the
 // Linux Device list of the OCI specification.

@@ -19,7 +19,8 @@ use tonic::{
         Server, ServerTlsConfig,
     },
 };
-use crate::rpc::rpctls::grpctls::{SecCreateContainerRequest, SecStartContainerRequest, SecRemoveContainerRequest, SecExecProcessRequest, SecPauseContainerRequest, SecResumeContainerRequest, SecListContainersRequest, SecContainerInfoList, EmptyResponse};
+use crate::rpc::rpctls::grpctls::{SecCreateContainerRequest, SecStartContainerRequest, SecRemoveContainerRequest, SecExecProcessRequest, SecPauseContainerRequest, SecResumeContainerRequest, 
+    SecSignalProcessRequest, SecWaitProcessRequest, SecWaitProcessResponse, SecListContainersRequest, SecContainerInfoList};
 
 use std::net::SocketAddr;
 
@@ -46,7 +47,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
     async fn sec_create_container(
         &self,
         req: tonic::Request<SecCreateContainerRequest>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
 
         info!(sl!(), "grpctls: sec_create_container, string req: {:#?}", req);
         let mut ttrpc_req: protocols::agent::CreateContainerRequest = CreateContainerRequest::new(); 
@@ -80,7 +81,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
             Err(e) => Err(tonic::Status::new(
                                 tonic::Code::Internal,
                                 format!("{}", e))),
-            Ok(_) =>Ok(tonic::Response::new(EmptyResponse{})),
+            Ok(_) =>Ok(tonic::Response::new(())),
 
         }
     }
@@ -88,7 +89,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
     async fn sec_exec_process(
         &self,
         req: tonic::Request<SecExecProcessRequest>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
 
         // TBD: Need to add trace
         // trace_rpc_call!(conn_info, "SecAgent: exec_process", req);
@@ -118,14 +119,14 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
             Err(e) => Err(tonic::Status::new(
                                 tonic::Code::Internal,
                                 format!("{}", e))),
-            Ok(_) =>Ok(tonic::Response::new(EmptyResponse{})),
+            Ok(_) =>Ok(tonic::Response::new(()))
         }
     }
 
     async fn sec_pause_container(
         &self,
         req: tonic::Request<SecPauseContainerRequest>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
 
         let _conn_info = req
             .extensions()
@@ -153,13 +154,13 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                         format!("Service was not ready: {:?}", e)
                 )})?;
 
-        Ok(tonic::Response::new(EmptyResponse{}))
+        Ok(tonic::Response::new(()))
     }
     
     async fn sec_remove_container(
         &self,
         req: tonic::Request<SecRemoveContainerRequest>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         
         // TBD: Need to add trace
         // trace_rpc_call!(conn_info, "SecAgent: remove_container", req);
@@ -185,14 +186,14 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
             Err(e) => Err(tonic::Status::new(
                                 tonic::Code::Internal,
                                 format!("{}", e))),
-            Ok(_) =>Ok(tonic::Response::new(EmptyResponse{})),
+            Ok(_) =>Ok(tonic::Response::new(())),
         }
     }
 
     async fn sec_resume_container(
         &self,
         req: tonic::Request<SecResumeContainerRequest>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
 
         let _conn_info = req
             .extensions()
@@ -220,13 +221,13 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                         format!("Service was not ready: {:?}", e)
                 )})?;
 
-        Ok(tonic::Response::new(EmptyResponse{}))
+        Ok(tonic::Response::new(()))
     }
 
     async fn sec_start_container(
         &self,
         req: tonic::Request<SecStartContainerRequest>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
 
         let message = req.get_ref();
         let jstr = match serde_json::to_string(message) {
@@ -249,7 +250,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
             Err(e) => Err(tonic::Status::new(
                                 tonic::Code::Internal,
                                 format!("{}", e))),
-            Ok(_) =>Ok(tonic::Response::new(EmptyResponse{})),
+            Ok(_) =>Ok(tonic::Response::new(())),
 
         }
     }
@@ -273,6 +274,51 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         }))
 
     }
+
+    async fn sec_signal_process(
+        &self,
+        req: tonic::Request<SecSignalProcessRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+
+        info!(sl!(), "grpctls: sec_signal_process, string req: {:?}", req);
+        let mut ttrpc_req: protocols::agent::SignalProcessRequest = SignalProcessRequest::new(); 
+        let internal = req.into_inner();
+        ttrpc_req.set_container_id(internal.container_id);
+        ttrpc_req.set_exec_id(internal.exec_id);
+        ttrpc_req.set_signal(internal.signal);
+        
+        match self.do_signal_process(ttrpc_req).await {
+            Err(e) => Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("{}", e))),
+            Ok(_) =>Ok(tonic::Response::new(())),
+
+        }
+    }
+
+    async fn sec_wait_process(
+        &self,
+        req: tonic::Request<SecWaitProcessRequest>,
+    ) -> Result<tonic::Response<SecWaitProcessResponse>, tonic::Status> {
+
+        info!(sl!(), "grpctls: sec_wait_process, string req: {:?}", req);
+        let internal = req.into_inner();
+        let mut ttrpc_req: protocols::agent::WaitProcessRequest = WaitProcessRequest::new(); 
+        ttrpc_req.set_container_id(internal.container_id);
+        ttrpc_req.set_exec_id(internal.exec_id);
+
+        let response = self.do_wait_process(ttrpc_req)
+            .await
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("{:?}", e)
+                )})?;
+        let status = response.get_status();
+        Ok(tonic::Response:: new(SecWaitProcessResponse{status,
+        }))
+    }
+
 }
 
 fn from_file(file_path: &str) -> Result<String> {
