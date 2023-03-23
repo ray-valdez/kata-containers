@@ -20,7 +20,7 @@ use kata_types::mount::StorageDevice;
 use libc::pid_t;
 use oci::{ContainerState, Hook, Hooks};
 use protocols::agent::OnlineCPUMemRequest;
-use crate::rpc::rpctls::grpctls::{SecContainerInfo};
+use crate::rpc::rpctls::grpctls::{ContainerInfo};
 use regex::Regex;
 use rustjail::cgroups as rustjail_cgroups;
 use rustjail::container::BaseContainer;
@@ -289,11 +289,11 @@ impl Sandbox {
     }
 
     #[instrument]
-    pub fn list_containers(&self) -> Result<Vec<SecContainerInfo>> {
+    pub fn list_containers(&self) -> Result<Vec<ContainerInfo>> {
         let mut list = Vec::new();
 
         for (_, c) in self.containers.iter() {
-            let mut cinfo = SecContainerInfo {
+            let mut cinfo = ContainerInfo {
                 container_id: c.id(),
                 created: c.init_process_start_time,
                  ..Default::default()

@@ -10,7 +10,7 @@ pub mod grpctls {
 }
 
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
-use grpctls::{SecPauseContainerRequest, SecResumeContainerRequest, SecListContainersRequest};
+use grpctls::{PauseContainerRequest, ResumeContainerRequest, ListContainersRequest};
 
 const SERVER_PORT: u16 = 50090; 
 
@@ -62,26 +62,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match config.cmd {
         CmdKind::LISTCONTAINERS => {
-            let request = tonic::Request::new(SecListContainersRequest {
+            let request = tonic::Request::new(ListContainersRequest {
             });
-            let response = client.sec_list_containers(request).await?.into_inner();
+            let response = client.list_containers(request).await?.into_inner();
             //println!("RESPONSE={:?}", response);
             println!("{}", serde_json::to_string_pretty(&response).unwrap())
         }
 
         CmdKind::PAUSE => {
-            let request = tonic::Request::new(SecPauseContainerRequest {
+            let request = tonic::Request::new(PauseContainerRequest {
                 container_id: config.cid,
             });
-            let response = client.sec_pause_container(request).await?.into_inner();
+            let response = client.pause_container(request).await?.into_inner();
             println!("RESPONSE={:?}", response);
         }
 
         CmdKind::RESUME => {
-            let request = tonic::Request::new(SecResumeContainerRequest {
+            let request = tonic::Request::new(ResumeContainerRequest {
                 container_id: config.cid,
             });
-            let response = client.sec_resume_container(request).await?.into_inner();
+            let response = client.resume_container(request).await?.into_inner();
             println!("RESPONSE={:?}", response);
         }
     }

@@ -19,22 +19,22 @@ import "google/protobuf/empty.proto";
 // unstable
 service SecAgentService {
 	// execution
-	rpc SecCreateContainer(SecCreateContainerRequest) returns (google.protobuf.Empty);
-	rpc SecStartContainer(SecStartContainerRequest) returns (google.protobuf.Empty);
+	rpc CreateContainer(CreateContainerRequest) returns (google.protobuf.Empty);
+	rpc StartContainer(StartContainerRequest) returns (google.protobuf.Empty);
 
-	rpc SecRemoveContainer(SecRemoveContainerRequest) returns (google.protobuf.Empty);
-	rpc SecExecProcess(SecExecProcessRequest) returns (google.protobuf.Empty);
-        rpc SecSignalProcess(SecSignalProcessRequest) returns (google.protobuf.Empty);
-	rpc SecWaitProcess(SecWaitProcessRequest) returns (SecWaitProcessResponse); 
+	rpc RemoveContainer(RemoveContainerRequest) returns (google.protobuf.Empty);
+	rpc ExecProcess(ExecProcessRequest) returns (google.protobuf.Empty);
+        rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
+	rpc WaitProcess(WaitProcessRequest) returns (WaitProcessResponse); 
 
-	rpc SecPauseContainer(SecPauseContainerRequest) returns (google.protobuf.Empty);
-	rpc SecResumeContainer(SecResumeContainerRequest) returns (google.protobuf.Empty);
+	rpc PauseContainer(PauseContainerRequest) returns (google.protobuf.Empty);
+	rpc ResumeContainer(ResumeContainerRequest) returns (google.protobuf.Empty);
 	// new api 
-	rpc SecListContainers(SecListContainersRequest) returns(SecContainerInfoList);
+	rpc ListContainers(ListContainersRequest) returns(ContainerInfoList);
 
 }
 
-message SecCreateContainerRequest {
+message CreateContainerRequest {
         string container_id = 1;
         string exec_id = 2;
         StringUser string_user = 3;
@@ -50,45 +50,45 @@ message SecCreateContainerRequest {
         bool sandbox_pidns = 7;
 }
 
-message SecStartContainerRequest {
+message StartContainerRequest {
     string container_id = 1;
 }
 
-message SecRemoveContainerRequest {
+message RemoveContainerRequest {
     string container_id = 1;
     uint32 timeout = 2;
 }
 
-message SecPauseContainerRequest {
+message PauseContainerRequest {
     string container_id = 1;
 }
 
-message SecResumeContainerRequest {
+message ResumeContainerRequest {
     string container_id = 1;
 }
 
-message SecListContainersRequest {
+message ListContainersRequest {
 }
 
-message SecContainerInfo {
+message ContainerInfo {
     string container_id = 1;
     uint64 created = 2;
     string state = 3;
     string annotations = 4;
 }
 
-message SecContainerInfoList {
-   repeated SecContainerInfo SecContainerInfoList = 1; 
+message ContainerInfoList {
+   repeated ContainerInfo ContainerInfoList = 1; 
 }
 
-message SecExecProcessRequest {
+message ExecProcessRequest {
         string container_id = 1;
         string exec_id = 2;
         StringUser string_user = 3;
         Process process = 4;
 }
 
-message SecSignalProcessRequest {
+message SignalProcessRequest {
 	string container_id = 1;
 
 	// Special case for SignalProcess(): exec_id can be empty(""),
@@ -98,12 +98,12 @@ message SecSignalProcessRequest {
 	uint32 signal = 3;
 }
 
-message SecWaitProcessRequest {
+message WaitProcessRequest {
 	string container_id = 1;
 	string exec_id = 2;
 }
 
-message SecWaitProcessResponse {
+message WaitProcessResponse {
 	int32 status = 1;
 }
 

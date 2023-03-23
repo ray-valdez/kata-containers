@@ -8,7 +8,7 @@ use crate::types::{Config, Options};
 use crate::utils;
 use anyhow::{anyhow, Result};
 use nix::sys::socket::{connect, socket, AddressFamily, SockAddr, SockFlag, SockType};
-use protocols::agent::*;
+use protocols::agent;
 use slog::{debug, info};
 use std::io;
 use std::io::Write; // XXX: for flush()
@@ -28,9 +28,9 @@ use grpctls::image_client::ImageClient;
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
 
 use grpctls::{
-    PullImageRequest, SecCreateContainerRequest, SecExecProcessRequest, SecListContainersRequest,
-    SecPauseContainerRequest, SecRemoveContainerRequest, SecResumeContainerRequest,
-    SecStartContainerRequest, SecSignalProcessRequest, SecWaitProcessRequest
+    PullImageRequest, CreateContainerRequest, ExecProcessRequest, ListContainersRequest,
+    PauseContainerRequest, RemoveContainerRequest, ResumeContainerRequest,
+    StartContainerRequest, SignalProcessRequest, WaitProcessRequest
 };
 
 macro_rules! run_if_auto_values {
@@ -1166,7 +1166,7 @@ async fn agent_cmd_container_create(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecCreateContainerRequest = utils::make_request(args)?;
+    let mut req: CreateContainerRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1201,12 +1201,12 @@ async fn agent_cmd_container_create(
     debug!(sl!(), "Request"; "tls rpc request" => format!("{:?}", req));
 
     if !nsend {
-        let reply = client.sec_create_container(req).await?.into_inner();
+        let reply = client.create_container(req).await?.into_inner();
 
         info!(sl!(), "response received";
             "response" => format!("{:?}", reply));
     } else {
-        let mut ttrpc_req: protocols::agent::CreateContainerRequest = CreateContainerRequest::new();
+        let mut ttrpc_req = agent::CreateContainerRequest::new();
         ttrpc_req.set_container_id(req.container_id);
         ttrpc_req.set_exec_id(req.exec_id);
         ttrpc_req.set_sandbox_pidns(req.sandbox_pidns);
@@ -1230,11 +1230,11 @@ async fn agent_cmd_container_list(
     _options: &mut Options,
     _args: &str,
 ) -> Result<()> {
-    let req = tonic::Request::new(SecListContainersRequest {});
+    let req = tonic::Request::new(ListContainersRequest {});
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_list_containers(req).await?.into_inner();
+    let reply = client.list_containers(req).await?.into_inner();
 
     println!("{}", serde_json::to_string_pretty(&reply).unwrap());
 
@@ -1249,7 +1249,7 @@ async fn agent_cmd_container_remove(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecRemoveContainerRequest = utils::make_request(args)?;
+    let mut req: RemoveContainerRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1265,7 +1265,7 @@ async fn agent_cmd_container_remove(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_remove_container(req).await?.into_inner();
+    let reply = client.remove_container(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1281,7 +1281,7 @@ async fn agent_cmd_container_exec(
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let req: SecExecProcessRequest = utils::make_request(args)?;
+    let req: ExecProcessRequest = utils::make_request(args)?;
 
     //let mut req: SecExecProcessRequest = utils::make_request(args)?;
     //println!("XXX after args {:?}", req);
@@ -1318,7 +1318,7 @@ async fn agent_cmd_container_exec(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_exec_process(req).await?.into_inner();
+    let reply = client.exec_process(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1368,7 +1368,7 @@ async fn agent_cmd_container_pause(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecPauseContainerRequest = utils::make_request(args)?;
+    let mut req: PauseContainerRequest = utils::make_request(args)?;
     //
     let ctx = clone_context(ctx);
 
@@ -1380,7 +1380,7 @@ async fn agent_cmd_container_pause(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_pause_container(req).await?.into_inner();
+    let reply = client.pause_container(req).await?.into_inner();
 
     info!(sl!(), "response received";
             "response" => format!("{:?}", reply));
@@ -1395,7 +1395,7 @@ async fn agent_cmd_container_resume(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecResumeContainerRequest = utils::make_request(args)?;
+    let mut req: ResumeContainerRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1408,7 +1408,7 @@ async fn agent_cmd_container_resume(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_resume_container(req).await?.into_inner();
+    let reply = client.resume_container(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1425,7 +1425,7 @@ async fn agent_cmd_container_start(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecStartContainerRequest = utils::make_request(args)?;
+    let mut req: StartContainerRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1439,7 +1439,7 @@ async fn agent_cmd_container_start(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_start_container(req).await?.into_inner();
+    let reply = client.start_container(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1511,7 +1511,7 @@ async fn agent_cmd_container_wait_process(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecWaitProcessRequest = utils::make_request(args)?;
+    let mut req: WaitProcessRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1526,18 +1526,10 @@ async fn agent_cmd_container_wait_process(
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-    let reply = client.sec_wait_process(req).await?.into_inner();
+    let reply = client.wait_process(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
-/*
-    let reply = client
-        .wait_process(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-*/
     Ok(())
 }
 
@@ -1549,7 +1541,7 @@ async fn agent_cmd_container_signal_process(
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let mut req: SecSignalProcessRequest = utils::make_request(args)?;
+    let mut req: SignalProcessRequest = utils::make_request(args)?;
 
     let ctx = clone_context(ctx);
 
@@ -1575,7 +1567,7 @@ async fn agent_cmd_container_signal_process(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.sec_signal_process(req).await?.into_inner();
+    let reply = client.signal_process(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
