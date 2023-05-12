@@ -12,8 +12,12 @@ use anyhow::Result;
 use crate::AGENT_CONFIG;
 
 const AA_PATH: &str = "/usr/local/bin/attestation-agent";
-const AA_KEYPROVIDER_PORT: &str = "127.0.0.1:50000";
-const AA_GETRESOURCE_PORT: &str = "127.0.0.1:50001";
+
+const AA_KEYPROVIDER_URI: &str =
+    "unix:///run/confidential-containers/attestation-agent/keyprovider.sock";
+const AA_GETRESOURCE_URI: &str =
+    "unix:///run/confidential-containers/attestation-agent/getresource.sock";
+
 const OCICRYPT_CONFIG_PATH: &str = "/tmp/ocicrypt_config.json";
 
 // Convenience macro to obtain the scope logger
@@ -45,7 +49,7 @@ impl AttestationService {
         let ocicrypt_config = serde_json::json!({
             "key-providers": {
                 "attestation-agent":{
-                    "grpc":AA_KEYPROVIDER_PORT
+                    "ttrpc":AA_KEYPROVIDER_URI
                 }
             }
         });
@@ -56,9 +60,9 @@ impl AttestationService {
         // The Attestation Agent will run for the duration of the guest.
         Command::new(AA_PATH)
             .arg("--keyprovider_sock")
-            .arg(AA_KEYPROVIDER_PORT)
+            .arg(AA_KEYPROVIDER_URI)
             .arg("--getresource_sock")
-            .arg(AA_GETRESOURCE_PORT)
+            .arg(AA_GETRESOURCE_URI)
             .spawn()?;
         Ok(())
     }

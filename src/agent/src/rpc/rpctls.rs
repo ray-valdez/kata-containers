@@ -328,10 +328,10 @@ fn from_file(file_path: &str) -> Result<String> {
     Ok(file_content)
 }
 
-pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, 
+pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool, 
     aa_service: Arc<Mutex<AttestationService>>) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
 
-    let sec_agent = AgentService { sandbox: s.clone() };
+    let sec_agent = AgentService { sandbox: s.clone(), init_mode,  };
     let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);    
 
     let image_service = ImageService::new(s, aa_service);

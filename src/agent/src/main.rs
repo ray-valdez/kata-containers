@@ -414,16 +414,23 @@ async fn start_sandbox(
     let aa_init = aa_instance.lock().await;
     aa_init.start_attestation_agent().await?;
     
+    println!("RV main.rs: disabled getting tls keys!");
+    // RV: Disabled getting key!, REMOVE if statement!!  
     // downloading and extracting the tls keys for the grpctls server
-    secrets::retrieve_secrets().await?;
+    if secrets::tls_keys_exist() {
+     secrets::retrieve_secrets().await?;
+    }
+    
     
     // unlocking the attestation agent
     drop(aa_init);
 
     // if the tls keys are downloaded and extracted, then start the grpctls server
+    println!("RV main.rs: print gserver");
     if secrets::tls_keys_exist() {
         // ipaddr://ip:port
-        let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), aa_instance.clone())?;
+        println!("RV main.rs: before call to gserver");
+        let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode, aa_instance.clone())?;
         gserver.await?;
     }
 

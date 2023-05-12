@@ -23,15 +23,27 @@ mod get_resource {
     #![allow(clippy::derive_partial_eq_without_eq)]
     tonic::include_proto!("getresource");
 }
+use std::result::Result::Ok;
 
 
 /// Attestation Agent's GetResource gRPC address.
 /// It's given <https://github.com/confidential-containers/attestation-agent#run>
-pub const AA_GETRESOURCE_ADDR: &str = "http://127.0.0.1:50001";
+// pub const AA_GETRESOURCE_ADDR: &str = "http://127.0.0.1:50001";
+const AA_GETRESOURCE_URI: &str =
+    "unix:///run/confidential-containers/attestation-agent/getresource.sock";
+
 pub const TLS_KEYS_CONFIG_DIR: &str = "/run/tls-keys";
 pub const TLS_KEYS_FILE_PATH: &str = "/run/tls-keys/tls_key.zip";
+pub const KBS_RESOURCE_PATH: &str = "/default/tenant-keys/tls_keys.zip";
+
+macro_rules! sl {
+    () => {
+        slog_scope::logger()
+    };
+}
 
 /// Signature submodule agent for image signature veriication.
+#[allow(dead_code)]
 pub struct Agent {
     /// Get Resource Service client.
     client: GetResourceServiceClient<Channel>,
@@ -70,13 +82,13 @@ impl Agent {
                 return Err(anyhow!("aa_kbc_params: missing KBS URI"));
             }
 
-            let mut attestation_conn = GetResourceServiceClient::connect(AA_GETRESOURCE_ADDR).await;
+            let mut attestation_conn = GetResourceServiceClient::connect(AA_GETRESOURCE_URI).await;
 
             let one_second = time::Duration::from_millis(1000);
 
             // wait here until the attestation agent is not ready and running
             while !attestation_conn.is_ok() {
-                attestation_conn = GetResourceServiceClient::connect(AA_GETRESOURCE_ADDR).await;
+                attestation_conn = GetResourceServiceClient::connect(AA_GETRESOURCE_URI).await;
                 //println!("Attestation agent is not ready, waiting for it...");
                 thread::sleep(one_second);
             }
@@ -97,15 +109,29 @@ impl Agent {
     /// for more information.
     /// Then save the gathered data into `path`
     async fn get_resource(&mut self, resource_name: &str, path: &str) -> Result<()> {
+
         let resource_description = serde_json::to_string(&ResourceDescription::new(resource_name))?;
+
         let req = tonic::Request::new(GetResourceRequest {
             kbc_name: self.kbc_name.clone(),
             kbs_uri: self.kbc_uri.clone(),
             resource_description,
         });
-        
+
         // request sent to attestation agent
-        let res = self.client.get_resource(req).await?;
+        //
+        // let res  = match self.client.get_resource(&self.kbc_name, &resource_name, &self.kbs_uri)
+
+        info!(sl!(), "RV get_res kbc_name: {}", &self.kbc_name);
+        let res = match self.client.get_resource(req)
+         .await {
+            Ok(data) => data,
+            Err(e) => { println!("Error: {:?}", e);
+                        // return Err(e)
+                        return Err(anyhow!("Wrong")).context("From a useless function")
+                      }
+        };
+
 
         // response received from attestation agent, and storing 
         // the resonse in the tls config directory as a zipped file
@@ -166,7 +192,8 @@ impl Agent {
         }
 
         // obtain the tls keys from KBS through attestation agent
-        self.get_resource("Secrets", TLS_KEYS_FILE_PATH).await?;
+        //self.get_resource("Secrets", TLS_KEYS_FILE_PATH).await?;
+        self.get_resource(KBS_RESOURCE_PATH, TLS_KEYS_FILE_PATH).await?;
 
         // zip the tls zipped file: /run/tls-keys/tls_key.zip
         // and storing the extracted files in /run/tls-keys
