@@ -77,7 +77,6 @@ use tokio::{
 
 mod image_rpc;
 mod rpc;
-//mod rpctls;
 mod secrets;
 mod aagent;
 mod tracer;
@@ -414,22 +413,20 @@ async fn start_sandbox(
     let aa_init = aa_instance.lock().await;
     aa_init.start_attestation_agent().await?;
     
-    println!("RV main.rs: disabled getting tls keys!");
-    // RV: Disabled getting key!, REMOVE if statement!!  
     // downloading and extracting the tls keys for the grpctls server
-    if secrets::tls_keys_exist() {
-     secrets::retrieve_secrets().await?;
-    }
-    
+     match secrets::retrieve_secrets()
+      .await {
+         Ok(_) => println!("main: SUCCESS in getting tenant-keys"),
+         Err(e) => { println!("main: ERROR in get keys: {:?}", e)
+                   }
+      }
+
     
     // unlocking the attestation agent
     drop(aa_init);
 
     // if the tls keys are downloaded and extracted, then start the grpctls server
-    println!("RV main.rs: print gserver");
     if secrets::tls_keys_exist() {
-        // ipaddr://ip:port
-        println!("RV main.rs: before call to gserver");
         let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode, aa_instance.clone())?;
         gserver.await?;
     }

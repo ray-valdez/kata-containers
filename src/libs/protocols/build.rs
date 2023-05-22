@@ -301,7 +301,6 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .compile(
             &["secprotos/google/protobuf/empty.proto",
             "secprotos/secagent.proto",
-            "secprotos/secgetresource.proto",
             "secprotos/oci.proto",
             "secprotos/types.proto",
             "secprotos/image.proto" ], 
