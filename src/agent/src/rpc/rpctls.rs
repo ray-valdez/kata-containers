@@ -11,6 +11,7 @@ use anyhow::{anyhow, Result};
 use protocols::agent; 
 use crate::sandbox::Sandbox;
 use crate::image_rpc::ImageService;
+use crate::version::{AGENT_VERSION, API_VERSION};
 use rustjail::container::{Container};
 
 use tonic::{
@@ -20,11 +21,14 @@ use tonic::{
     },
 };
 
-use crate::rpc::rpctls::grpctls::{CreateContainerRequest, StartContainerRequest,RemoveContainerRequest, ExecProcessRequest, PauseContainerRequest, ResumeContainerRequest, SignalProcessRequest, WaitProcessRequest,WaitProcessResponse, ListContainersRequest, ContainerInfoList};
+//use crate::rpc::rpctls::grpctls::{CreateContainerRequest, StartContainerRequest,RemoveContainerRequest, ExecProcessRequest, PauseContainerRequest, ResumeContainerRequest, SignalProcessRequest, WaitProcessRequest,WaitProcessResponse, ListContainersRequest, ContainerInfoList, CheckRequest, HealthCheckResponse, VersionCheckResponse};
+//
+use crate::rpc::rpctls::grpctls::{CreateContainerRequest, StartContainerRequest,RemoveContainerRequest, ExecProcessRequest, PauseContainerRequest, ResumeContainerRequest, SignalProcessRequest, WaitProcessRequest,WaitProcessResponse, ListContainersRequest, ContainerInfoList, CheckRequest, health_check_response, HealthCheckResponse, VersionCheckResponse};
 
 use std::net::SocketAddr;
 
 use super::AgentService;
+use super::HealthService;
 
 use crate::aagent::AttestationService;
 
@@ -321,6 +325,30 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
 
 }
 
+#[tonic::async_trait]
+impl grpctls::health_server::Health for HealthService {
+   async fn check(
+        &self,
+        _req: tonic::Request<CheckRequest>,
+    ) -> Result<tonic::Response<HealthCheckResponse>, tonic::Status> {
+        let resp = HealthCheckResponse {
+                status: health_check_response::ServingStatus::Serving.into(),
+        };
+
+       Ok(tonic::Response:: new(resp))
+    }
+
+   async fn version(
+        &self,
+        req: tonic::Request<CheckRequest>,
+    ) -> Result<tonic::Response<VersionCheckResponse>, tonic::Status> {
+        info!(sl!(), "version {:?}", req);
+
+        Ok(tonic::Response:: new(VersionCheckResponse {agent_version: AGENT_VERSION.to_string(),
+            grpc_version: API_VERSION.to_string()}))
+    }
+}
+
 fn from_file(file_path: &str) -> Result<String> {
     let file_content = fs::read_to_string(file_path)
         .map_err(|e| anyhow!("Read {:?} file failed: {:?}", file_path, e))?;
@@ -336,6 +364,13 @@ pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool,
 
     let image_service = ImageService::new(s, aa_service);
     let iservice = grpctls::image_server::ImageServer::new(image_service);
+
+    // let health_service = HealthService::new();
+    //let health_service = Box::new(HealthService{}) as Box<dyn grpctls::health_server::Health + Send + Sync > ;
+
+    //let health_service = Box::new(HealthService{});
+    let health_service = HealthService{};
+    let hservice = grpctls::health_server::HealthServer::new(health_service);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], GRPC_TLS_SERVER_PORT));
 
@@ -362,6 +397,7 @@ pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool,
         .tls_config(tls)?
         .add_service(sec_svc)
         .add_service(iservice)
+        .add_service(hservice)
         .serve(addr);
 
     info!(sl!(), "gRPC TLS server started"; "address" => server_address);

@@ -248,6 +248,7 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
 
     tonic_build::configure()
         .out_dir("src/grpctls")
+        .type_attribute("CheckRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("ContainerInfoList", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("ContainerInfo", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("CreateContainerRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
@@ -298,11 +299,16 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("Hook", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("Mount", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(default)] ")
         .type_attribute("LinuxDevice", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
+        .type_attribute("ServingStatus", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .field_attribute("UNKNOWN", "#[serde (rename = \"UNKNOWN\")]")
+        .field_attribute("SERVING", "#[serde (rename = \"SERVING\")]")
+        .field_attribute("NOT_SERVING", "#[serde (rename = \"NOT_SERVING\")]")
         .compile(
             &["secprotos/google/protobuf/empty.proto",
             "secprotos/secagent.proto",
             "secprotos/oci.proto",
             "secprotos/types.proto",
+            "secprotos/health.proto",
             "secprotos/image.proto" ], 
             &["secprotos"],
         )?;
