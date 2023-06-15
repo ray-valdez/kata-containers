@@ -26,6 +26,7 @@ use crate::AGENT_CONFIG;
 const ANNO_K8S_IMAGE_NAME: &str = "io.kubernetes.cri.image-name";
 
 use image_rs::image::ImageClient;
+use std::io::Write;
 
 use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
 use crate::rpc::rpctls::grpctls;
@@ -109,6 +110,34 @@ impl ImageService {
         }
 
         Ok(pause_rootfs.display().to_string())
+    }
+
+    // If we fail to start the AA, ocicrypt won't be able to unwrap keys
+    // and container decryption will fail.
+    fn init_attestation_agent() -> Result<()> {
+        let config_path = OCICRYPT_CONFIG_PATH;
+
+        // The image will need to be encrypted using a keyprovider
+        // that has the same name (at least according to the config).
+        let ocicrypt_config = serde_json::json!({
+            "key-providers": {
+                "attestation-agent":{
+                    "ttrpc":AA_KEYPROVIDER_URI
+                }
+            }
+        });
+
+        let mut config_file = fs::File::create(config_path)?;
+        config_file.write_all(ocicrypt_config.to_string().as_bytes())?;
+
+        // The Attestation Agent will run for the duration of the guest.
+        Command::new(AA_PATH)
+            .arg("--keyprovider_sock")
+            .arg(AA_KEYPROVIDER_URI)
+            .arg("--getresource_sock")
+            .arg(AA_GETRESOURCE_URI)
+            .spawn()?;
+        Ok(())
     }
 
     /// Determines the container id (cid) to use for a given request.

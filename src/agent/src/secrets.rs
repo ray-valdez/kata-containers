@@ -30,14 +30,14 @@ macro_rules! sl {
     };
 }
 
-/// Signature submodule agent for image signature veriication.
-pub struct Agent {
+/// To provision secrets from kbs
+pub struct Retriever {
     kbc_name: String,
-    kbc_uri: String,
+    kbs_uri: String,
 }
 
-impl Agent {
-    /// Create a new signature-agent, the input parameter:
+impl Retriever {
+    /// Create a new retriver, the input parameter:
     /// * `aa_kbc_params`: s string with format `<kbc_name>::<kbs_uri>`.
     pub async fn new(aa_kbc_params: &str) -> Result<Self> {
         // unzip here is unstable
@@ -53,7 +53,7 @@ impl Agent {
             // attestation agent is running at this point
             Ok(Self {
                 kbc_name: kbc_name.into(),
-                kbc_uri: kbs_uri.into(),
+                kbs_uri: kbs_uri.into(),
             })
         } else {
             Err(anyhow!("aa_kbc_params: KBC/KBS pair not found"))
@@ -109,7 +109,7 @@ impl Agent {
         }
 
         info!(sl!(), "get_tls_key: kbc_name: {}", &self.kbc_name);
-        info!(sl!(), "get_tts_key: kbc_uri: {}", &self.kbc_uri);
+        info!(sl!(), "get_tts_key: kbc_uri: {}", &self.kbs_uri);
         info!(sl!(), "get_tls_key: KBS_RESOURCE_PATH: {}", KBS_RESOURCE_PATH);
 
         // FIXME: Hard-coded sample attester for now 
@@ -124,7 +124,7 @@ impl Agent {
 
         let resource_bytes = match attestation_agent
         .download_confidential_resource(&self.kbc_name.to_string(), KBS_RESOURCE_PATH, 
-                                        &self.kbc_uri.to_string())
+                                        &self.kbs_uri.to_string())
         .await {
             Ok(data) => data,
             Err(e) => {
@@ -149,9 +149,8 @@ pub async fn retrieve_secrets() -> Result<()> {
             let wrapped_aa_kbc_params = wrapped_aa_kbc_params.to_string();
             let m_aa_kbc_params = wrapped_aa_kbc_params.trim_start_matches("provider:attestation-agent:");
 
-            let mut m_agent = Agent::new(m_aa_kbc_params).await?;
-            // m_agent.get_tls_keys(aa_service).await?;
-            m_agent.get_tls_keys().await?;
+            let mut retriver = Retriever::new(m_aa_kbc_params).await?;
+            retriver.get_tls_keys().await?;
         }
     }
     Ok(())

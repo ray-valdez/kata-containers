@@ -30,8 +30,6 @@ use std::net::SocketAddr;
 use super::AgentService;
 use super::HealthService;
 
-use crate::aagent::AttestationService;
-
 pub mod grpctls {
     tonic::include_proto!("grpctls");
 }
@@ -356,13 +354,13 @@ fn from_file(file_path: &str) -> Result<String> {
     Ok(file_content)
 }
 
-pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool, 
-    aa_service: Arc<Mutex<AttestationService>>) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
+pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool) ->
+    Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
 
     let sec_agent = AgentService { sandbox: s.clone(), init_mode,  };
     let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);    
 
-    let image_service = ImageService::new(s, aa_service);
+    let image_service = ImageService::new(s);
     let iservice = grpctls::image_server::ImageServer::new(image_service);
 
     // let health_service = HealthService::new();
