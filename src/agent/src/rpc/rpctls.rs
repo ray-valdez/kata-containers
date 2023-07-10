@@ -1,18 +1,25 @@
-// Copyright (c) 2019 Ant Financial
+// copyright (c) 2019 ant financial
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::fs;
 use tokio::sync::Mutex;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
 
 use protocols::agent; 
+use crate::random;
 use crate::sandbox::Sandbox;
 use crate::image_rpc::ImageService;
+use crate::metrics::get_metrics as other_get_metrics;
 use crate::version::{AGENT_VERSION, API_VERSION};
-use rustjail::container::{Container};
+use rustjail::container::{BaseContainer, Container};
+
+use libc::{self, c_ushort, winsize, TIOCSWINSZ};
+use std::fs;
+use std::net::SocketAddr;
+
+use nix::errno::Errno;
 
 use tonic::{
     transport::{
@@ -21,17 +28,23 @@ use tonic::{
     },
 };
 
-//use crate::rpc::rpctls::grpctls::{CreateContainerRequest, StartContainerRequest,RemoveContainerRequest, ExecProcessRequest, PauseContainerRequest, ResumeContainerRequest, SignalProcessRequest, WaitProcessRequest,WaitProcessResponse, ListContainersRequest, ContainerInfoList, CheckRequest, HealthCheckResponse, VersionCheckResponse};
-//
-use crate::rpc::rpctls::grpctls::{CreateContainerRequest, StartContainerRequest,RemoveContainerRequest, ExecProcessRequest, PauseContainerRequest, ResumeContainerRequest, SignalProcessRequest, WaitProcessRequest,WaitProcessResponse, ListContainersRequest, ContainerInfoList, CheckRequest, health_check_response, HealthCheckResponse, VersionCheckResponse};
+use crate::rpc::rpctls::grpctls::{CreateContainerRequest, CloseStdinRequest, ExecProcessRequest, GetMetricsRequest, 
+    GetOomEventRequest, Interfaces, ListInterfacesRequest, ListContainersRequest, ListRoutesRequest, Metrics, 
+    OomEvent, PauseContainerRequest, ReadStreamRequest, ReadStreamResponse, RemoveContainerRequest, ReseedRandomDevRequest, 
+    ResumeContainerRequest, Routes, SetGuestDateTimeRequest, SignalProcessRequest, StartContainerRequest, 
+    TtyWinResizeRequest, WaitProcessRequest, WaitProcessResponse, WriteStreamRequest, WriteStreamResponse, UpdateContainerRequest, 
+    CheckRequest, health_check_response, HealthCheckResponse, VersionCheckResponse, ContainerInfoList};
 
-use std::net::SocketAddr;
 
 use super::AgentService;
 use super::HealthService;
 
 pub mod grpctls {
     tonic::include_proto!("grpctls");
+}
+
+pub mod types {
+    tonic::include_proto!("types");
 }
 
 // Convenience macro to obtain the scope logger
@@ -96,7 +109,6 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         // TBD: Need to add trace
         // trace_rpc_call!(conn_info, "SecAgent: exec_process", req);
         // is_allowed!(req);
-        //
         //
 
         info!(sl!(), "grpctls: do_exec_process, string req: {:#?}", req);
@@ -226,6 +238,55 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         Ok(tonic::Response::new(()))
     }
 
+    async fn update_container(
+        &self,
+        req: tonic::Request<UpdateContainerRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        
+        let internal = req.into_inner();
+        let cid = internal.container_id.clone();
+        let res = internal.resources;
+
+        let s = Arc::clone(&self.sandbox);
+        let mut sandbox = s.lock().await;
+
+        let ctr = sandbox.get_container(&cid).ok_or_else(|| {
+            tonic::Status::new(
+               tonic::Code::InvalidArgument,
+               format!("invalid container id {}", cid)
+       )})?;
+
+        let resp = tonic::Response::new(());
+
+        // Convert grpctls::LinuxResources to protocol::oci::LinuxResources
+        let jstr = match serde_json::to_string(&res) {
+            Ok(j) => j,
+            Err(e) => return Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("Unable to serialize linuxresource: {}", e))),
+        };
+
+        let res_obj: protocols::oci::LinuxResources = match serde_json::from_str(&jstr) {
+            Ok(k) => k,
+            Err(e) => return Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("Unable to deserialize to linuxresource: {}", e))),
+        };
+
+        info!(sl!(), "grpctls: update_container linuxresource, res obj: {:?}", res_obj);
+
+        let oci_res = rustjail::resources_grpc_to_oci(&res_obj);
+        match ctr.set(oci_res) {
+            Err(e) => {
+                    return Err(tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("{}", e)));
+                }
+
+                Ok(_) => return Ok(resp),
+            }
+    }
+
     async fn start_container(
         &self,
         req: tonic::Request<StartContainerRequest>,
@@ -321,6 +382,310 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         }))
     }
 
+    async fn write_stdin(
+        &self,
+        req: tonic::Request<WriteStreamRequest>,
+    ) -> Result<tonic::Response<WriteStreamResponse>, tonic::Status> {
+
+        let internal = req.into_inner();
+        let mut ttrpc_req = agent::WriteStreamRequest::new(); 
+
+        ttrpc_req.set_container_id(internal.container_id);
+        ttrpc_req.set_exec_id(internal.exec_id);
+        ttrpc_req.set_data(internal.data);
+
+        let response = self.do_write_stream(ttrpc_req)
+            .await
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("{:?}", e)
+                )})?;
+
+        let len = response.get_len();
+
+        Ok(tonic::Response:: new(WriteStreamResponse{len: len}))
+    }
+
+    async fn read_stdout(
+        &self,
+        req: tonic::Request<ReadStreamRequest>,
+    ) -> Result<tonic::Response<ReadStreamResponse>, tonic::Status> {
+        
+        let internal = req.into_inner();
+        let mut ttrpc_req = agent::ReadStreamRequest::new(); 
+
+        ttrpc_req.set_container_id(internal.container_id);
+        ttrpc_req.set_exec_id(internal.exec_id);
+        ttrpc_req.set_len(internal.len);
+
+        let response = self.do_read_stream(ttrpc_req, true)
+            .await
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("{:?}", e)
+                )})?;
+
+        let data = response.get_data();
+
+        Ok(tonic::Response:: new(ReadStreamResponse{data: data.to_vec()}))
+    }
+
+    async fn close_stdin(
+        &self,
+        req: tonic::Request<CloseStdinRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+
+        let internal = req.into_inner();
+
+        let cid = internal.container_id.clone();
+        let eid = internal.exec_id;
+        let s = Arc::clone(&self.sandbox);
+        let mut sandbox = s.lock().await;
+
+        let p = sandbox
+            .find_container_process(cid.as_str(), eid.as_str())
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::InvalidArgument,
+                        format!("invalid argument: {:?}", e)
+                )})?;
+
+
+        p.close_stdin();
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn read_stderr(
+        &self,
+        req: tonic::Request<ReadStreamRequest>,
+    ) -> Result<tonic::Response<ReadStreamResponse>, tonic::Status> {
+        
+        let internal = req.into_inner();
+        let mut ttrpc_req = agent::ReadStreamRequest::new(); 
+
+        ttrpc_req.set_container_id(internal.container_id);
+        ttrpc_req.set_exec_id(internal.exec_id);
+        ttrpc_req.set_len(internal.len);
+
+        let response = self.do_read_stream(ttrpc_req, false)
+            .await
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("{:?}", e)
+                )})?;
+
+        let data = response.get_data();
+
+        Ok(tonic::Response:: new(ReadStreamResponse{data: data.to_vec()}))
+    }
+
+   async fn tty_win_resize(
+        &self,
+        req: tonic::Request<TtyWinResizeRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        info!(sl!(), "grpctls: tty_win_resize req: {:?}", req);
+
+        let internal = req.into_inner();
+        
+        let cid = internal.container_id.clone();
+        let eid = internal.exec_id.clone();
+        let row = internal.row;
+        let column = internal.column;
+
+        let s = Arc::clone(&self.sandbox);
+        let mut sandbox = s.lock().await;
+        let p = sandbox
+            .find_container_process(cid.as_str(), eid.as_str())
+            .map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unavailable,
+                    format!("invalid argument: {:?}", e)
+            )})?;
+
+        if let Some(fd) = p.term_master {
+            unsafe {
+                let win = winsize {
+                    ws_row: row as c_ushort,
+                    ws_col: column as c_ushort,
+                    ws_xpixel: 0,
+                    ws_ypixel: 0,
+                };
+
+                let err = libc::ioctl(fd, TIOCSWINSZ, &win);
+                Errno::result(err).map(drop).map_err(|e| {
+                    tonic::Status::new(tonic::Code::Internal, format!("ioctl error: {:?}", e))
+                })?;
+            }
+        } else {
+            // return Err(ttrpc_error!(ttrpc::Code::UNAVAILABLE, "no tty".to_string()));
+            return Err(tonic::Status::new(tonic::Code::Unavailable, format!("no tty")));
+        }
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn list_interfaces(
+        &self,
+        req: tonic::Request<ListInterfacesRequest>,
+    ) -> Result<tonic::Response<Interfaces>, tonic::Status> {
+
+        info!(sl!(), "grpctls: list_interfaces, string req: {:?}", req);
+
+        let list = self
+            .sandbox
+            .lock()
+            .await
+            .rtnl
+            .list_interfaces()
+            .await
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("Failed to list interfaces: {:?}", e),
+                )
+            })?;
+        // Convert to grpctls type
+        let vec_interface_str = match serde_json::to_string(&list) {
+            Ok(j) => j,
+            Err(e) => return Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("Unable to serialize{}", e))),
+        };
+        info!(sl!(), "grpctls: list interfaces, string vec_interface_str {}", vec_interface_str);
+
+        let g_interface: Vec<types::Interface> = match serde_json::from_str(&vec_interface_str) {
+            Ok(k) => k,
+            Err(e) => return Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("Unable to deserialize {:?} ", e))),
+        };
+
+        info!(sl!(), "grpctls: interface  obj: {:?}", g_interface);
+
+        Ok(tonic::Response:: new (Interfaces {  
+            interfaces: g_interface,
+            ..Default::default()
+        }))
+    }
+
+    async fn list_routes(
+        &self,
+        _req: tonic::Request<ListRoutesRequest>,
+    ) -> Result<tonic::Response<Routes>, tonic::Status> {
+
+        let list = self
+            .sandbox
+            .lock()
+            .await
+            .rtnl
+            .list_routes()
+            .await
+            .map_err(|e| {
+                tonic::Status::new(
+                        tonic::Code::Internal,
+                        format!("list routes: {:?}", e),
+                )
+            })?;
+            
+        // Convert  protocols::types::Route to rpctls::types::Route
+        let vec_routes_str = match serde_json::to_string(&list) {
+            Ok(j) => j,
+            Err(e) => return Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("Unable to serialize route list {}", e))),
+        };
+        info!(sl!(), "grpctls: route list string {}", vec_routes_str);
+
+        let vec_routes: Vec<types::Route> = match serde_json::from_str(&vec_routes_str) {
+            Ok(k) => k,
+            Err(e) => return Err(tonic::Status::new(
+                                tonic::Code::Internal,
+                                format!("Unable to deserialize route lsit{:?} ", e))),
+        };
+
+        info!(sl!(), "grpctls: interface  obj: {:?}", vec_routes);
+        Ok(tonic::Response:: new (Routes {
+            routes: vec_routes,
+            ..Default::default()
+        }))
+    }
+
+    async fn get_metrics(
+        &self,
+        req: tonic::Request<GetMetricsRequest>,
+    ) -> Result<tonic::Response<Metrics>, tonic::Status> {
+
+        info!(sl!(), "grpctls: get_metrics, string req: {:?}", req);
+        let ttrpc_req = protocols::agent::GetMetricsRequest::new(); 
+
+        match other_get_metrics(&ttrpc_req) {
+            Err(e) => Err(tonic::Status::new(
+                tonic::Code::Internal,
+                format!("{}", e))),
+            Ok(s) => {
+                Ok(tonic::Response:: new(Metrics{metrics: s}))
+            }
+        }
+    }
+
+    async fn reseed_random_dev(
+        &self,
+        req: tonic::Request<ReseedRandomDevRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        info!(sl!(), "grpctls: reseed_random_dev req: {:?}", req);
+        let data = req.into_inner().data;
+
+        random::reseed_rng(data.as_slice())
+            .map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("{:?}", e)
+            )})?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn set_guest_date_time(
+        &self,
+        req: tonic::Request<SetGuestDateTimeRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+
+        let internal = req.into_inner();
+
+        super::do_set_guest_date_time(internal.sec, internal.usec)
+            .map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("{:?}", e)
+            )})?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn get_oom_event(
+        &self,
+        _req: tonic::Request<GetOomEventRequest>,
+    ) -> Result<tonic::Response<OomEvent>, tonic::Status> {
+        
+        let sandbox = self.sandbox.clone();
+        let s = sandbox.lock().await;
+        let event_rx = &s.event_rx.clone();
+        let mut event_rx = event_rx.lock().await;
+        drop(s);
+        drop(sandbox);
+
+        if let Some(container_id) = event_rx.recv().await {
+            info!(sl!(), "get_oom_event return {}", &container_id);
+
+            return Ok(tonic::Response:: new(OomEvent{container_id}))
+        }
+
+        Err(tonic::Status::new(tonic::Code::Internal, format!("")))
+    }
 }
 
 #[tonic::async_trait]
@@ -390,7 +755,7 @@ pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool) -
         .identity(id)
         .client_ca_root(ca);
 
-    //let grpc_tls: impl tonic::transport::Server = Server::builder()
+    // Create server
     let grpc_tls = Server::builder()
         .tls_config(tls)?
         .add_service(sec_svc)
