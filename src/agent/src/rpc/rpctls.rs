@@ -14,9 +14,14 @@ use crate::image_rpc::ImageService;
 use crate::metrics::get_metrics as other_get_metrics;
 use crate::version::{AGENT_VERSION, API_VERSION};
 use rustjail::container::{BaseContainer, Container};
+use serde_json::Value;
+use serde_json::json;
+
+
 
 use libc::{self, c_ushort, winsize, TIOCSWINSZ};
 use std::fs;
+use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 
 use nix::errno::Errno;
@@ -34,7 +39,6 @@ use crate::rpc::rpctls::grpctls::{CreateContainerRequest, CloseStdinRequest, Exe
     ResumeContainerRequest, Routes, SetGuestDateTimeRequest, SignalProcessRequest, StartContainerRequest, 
     TtyWinResizeRequest, WaitProcessRequest, WaitProcessResponse, WriteStreamRequest, WriteStreamResponse, UpdateContainerRequest, 
     CheckRequest, health_check_response, HealthCheckResponse, VersionCheckResponse, ContainerInfoList};
-
 
 use super::AgentService;
 use super::HealthService;
@@ -557,17 +561,15 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         };
         info!(sl!(), "grpctls: list interfaces, string vec_interface_str {}", vec_interface_str);
 
-        let g_interface: Vec<types::Interface> = match serde_json::from_str(&vec_interface_str) {
+        let vec_interface: Vec<types::Interface> = match convert_interface(vec_interface_str) {
             Ok(k) => k,
             Err(e) => return Err(tonic::Status::new(
                                 tonic::Code::Internal,
-                                format!("Unable to deserialize {:?} ", e))),
+                                format!("Unable to deserialize interface list {:?} ", e))),
         };
 
-        info!(sl!(), "grpctls: interface  obj: {:?}", g_interface);
-
         Ok(tonic::Response:: new (Interfaces {  
-            interfaces: g_interface,
+            interfaces: vec_interface,
             ..Default::default()
         }))
     }
@@ -600,11 +602,11 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         };
         info!(sl!(), "grpctls: route list string {}", vec_routes_str);
 
-        let vec_routes: Vec<types::Route> = match serde_json::from_str(&vec_routes_str) {
+        let vec_routes: Vec<types::Route> = match convert_routes(vec_routes_str) {
             Ok(k) => k,
             Err(e) => return Err(tonic::Status::new(
                                 tonic::Code::Internal,
-                                format!("Unable to deserialize route lsit{:?} ", e))),
+                                format!("Unable to deserialize route list {:?} ", e))),
         };
 
         info!(sl!(), "grpctls: interface  obj: {:?}", vec_routes);
@@ -717,6 +719,88 @@ fn from_file(file_path: &str) -> Result<String> {
         .map_err(|e| anyhow!("Read {:?} file failed: {:?}", file_path, e))?;
 
     Ok(file_content)
+}
+
+fn convert_routes(route_str: String) -> Result< Vec<types::Route>, io::Error> {
+
+    let mut val: Value = match serde_json::from_str::<serde_json::Value>(&route_str)
+     {
+        Ok(v) => v,
+        Err(e) => return Err(e.into())
+
+     };
+
+    for  walk_value in val.as_array_mut().unwrap() {
+        if walk_value["family"]!= json!(null) {
+            match &walk_value["family"] {
+               Value::String(item) => {
+                          match item.as_str() {
+                               "v4" => { 
+                                         *walk_value.get_mut("family").unwrap() = json!(types::IpFamily::V4 as i32);
+                                         
+                                       },
+                               "v6" => { 
+                                         *walk_value.get_mut("family").unwrap() = json!(types::IpFamily::V6 as i32);
+                                       },
+                               _ => { 
+                                    return Err(io::Error::new(ErrorKind::InvalidInput, "Expected string v4 or v5"));
+                            }
+
+                          } 
+                }  
+                _ => { 
+                     return Err(io::Error::new(ErrorKind::InvalidInput, "Expected family"));
+                    }
+            } 
+        }
+
+    }
+
+    let g_route: Vec<types::Route> = serde_json::from_value(val).unwrap();
+    Ok(g_route)
+}
+
+fn convert_interface(interface_str: String) -> Result< Vec<types::Interface>, io::Error> {
+
+    let mut v: Value = match serde_json::from_str::<serde_json::Value>(&interface_str)
+    {
+        Ok(v) => v,
+        Err(e) => return Err(e.into())
+
+    };
+
+    for  walk_value in v.as_array_mut().unwrap() {
+        if walk_value["IPAddresses"] != json!(null) {
+            for obj in  walk_value["IPAddresses"].as_array_mut().unwrap() {
+                if obj["family"]!= json!(null) {
+                     match &obj["family"] {
+                        Value::String(item) => {
+                                   match item.as_str() {
+                                        "v4" => { 
+                                                  *obj.get_mut("family").unwrap() = json!(types::IpFamily::V4 as i32);
+                                                },
+                                        "v6" => {
+                                                  *obj.get_mut("family").unwrap() = json!(types::IpFamily::V6 as i32);
+                                                },
+                                        _ => { 
+                                                return Err(io::Error::new(ErrorKind::InvalidInput, "Expected string v4 or v5"));
+                                             }
+
+                                   } 
+
+                            }
+                        _ => { 
+                                return Err(io::Error::new(ErrorKind::InvalidInput, "Expected family"));
+
+                              }
+                     }
+                }
+
+            }
+        }
+    }
+    let g_interface: Vec<types::Interface> = serde_json::from_value(v).unwrap();
+    Ok(g_interface)
 }
 
 pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool) ->

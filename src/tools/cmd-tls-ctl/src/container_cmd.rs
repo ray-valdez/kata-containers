@@ -9,6 +9,11 @@ pub mod grpctls {
     tonic::include_proto!("grpctls");
 }
 
+pub mod types {
+    tonic::include_proto!("types");
+}
+
+
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
 use grpctls::{PauseContainerRequest, ResumeContainerRequest, ListContainersRequest};
 
