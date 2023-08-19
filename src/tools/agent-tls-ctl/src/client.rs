@@ -24,14 +24,22 @@ use ttrpc::context::Context;
 pub mod grpctls {
     tonic::include_proto!("grpctls");
 }
+
+pub mod types {
+    tonic::include_proto!("types");
+}
+
 use grpctls::image_client::ImageClient;
+use grpctls::health_client::HealthClient;
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
 
 use grpctls::{
-    PullImageRequest, CreateContainerRequest, ExecProcessRequest, ListContainersRequest,
-    PauseContainerRequest, RemoveContainerRequest, ResumeContainerRequest,
-    StartContainerRequest, SignalProcessRequest, WaitProcessRequest
+    PullImageRequest, CloseStdinRequest, CreateContainerRequest, ExecProcessRequest, GetMetricsRequest, GetOomEventRequest, ListContainersRequest,
+    ListInterfacesRequest, ListRoutesRequest, PauseContainerRequest, ReadStreamRequest, RemoveContainerRequest, ReseedRandomDevRequest, ResumeContainerRequest,
+    SetGuestDateTimeRequest, StartContainerRequest, SignalProcessRequest, TtyWinResizeRequest, WaitProcessRequest, WriteStreamRequest, UpdateContainerRequest,
+    CheckRequest
 };
+
 
 macro_rules! run_if_auto_values {
     ($ctx:expr, $closure:expr) => {{
@@ -88,7 +96,7 @@ type BuiltinCmdFp = fn(args: &str) -> (Result<()>, bool);
 #[allow(dead_code)]
 enum ServiceType {
     Agent,
-    //    Health,   // TBD
+    Health, 
     Image,
 }
 
@@ -147,21 +155,20 @@ static AGENT_CMDS: &[AgentCmd] = &[
         st: ServiceType::Agent,
         fp: agent_cmd_sandbox_add_swap,
     },
+    */
     AgentCmd {
         name: "Check",
         st: ServiceType::Health,
-        fp: agent_cmd_health_check,
     },
     AgentCmd {
         name: "Version",
         st: ServiceType::Health,
-        fp: agent_cmd_health_version,
     },
     AgentCmd {
         name: "CloseStdin",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_close_stdin,
     },
+    /*
     AgentCmd {
         name: "CopyFile",
         st: ServiceType::Agent,
@@ -187,16 +194,16 @@ static AGENT_CMDS: &[AgentCmd] = &[
         st: ServiceType::Agent,
         fp: agent_cmd_sandbox_get_ip_tables,
     },
+    */
     AgentCmd {
         name: "GetMetrics",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_get_metrics,
     },
     AgentCmd {
         name: "GetOOMEvent",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_get_oom_event,
     },
+    /*
     AgentCmd {
         name: "GetVolumeStats",
         st: ServiceType::Agent,
@@ -207,37 +214,30 @@ static AGENT_CMDS: &[AgentCmd] = &[
         name: "ListContainers",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "ListInterfaces",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_list_interfaces,
     },
     AgentCmd {
         name: "ListRoutes",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_list_routes,
-    }, */
+    }, 
     AgentCmd {
         name: "PauseContainer",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "ReadStderr",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_read_stderr,
     },
     AgentCmd {
         name: "ReadStdout",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_read_stdout,
     },
     AgentCmd {
         name: "ReseedRandomDev",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_reseed_random_dev,
-    }, */
+    }, 
     AgentCmd {
         name: "RemoveContainer",
         st: ServiceType::Agent,
@@ -246,12 +246,11 @@ static AGENT_CMDS: &[AgentCmd] = &[
         name: "ResumeContainer",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "SetGuestDateTime",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_set_guest_date_time,
     },
+    /*
     AgentCmd {
         name: "SetIptables",
         st: ServiceType::Agent,
@@ -266,29 +265,22 @@ static AGENT_CMDS: &[AgentCmd] = &[
         name: "StartContainer",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "TtyWinResize",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_tty_win_resize,
     },
     AgentCmd {
         name: "UpdateContainer",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_update_container,
     },
-    */
     AgentCmd {
         name: "WaitProcess",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "WriteStdin",
         st: ServiceType::Agent,
-        fp: agent_cmd_container_write_stdin,
     },
-    */
     AgentCmd {
         name: "PullImage",
         st: ServiceType::Image,
@@ -345,7 +337,7 @@ fn get_agent_cmd_details() -> Vec<String> {
     for cmd in AGENT_CMDS {
         let service = match cmd.st {
             ServiceType::Agent => "agent",
-            //            ServiceType::Health => "health",
+            ServiceType::Health => "health",
             ServiceType::Image => "image",
         };
 
@@ -474,7 +466,7 @@ async fn client_create_tls_channel<'a>(
     let str_front = "http://";
 
     let url_string = format!("{}{}:{}", str_front, server_address, server_port);
-    println!("url_string {}", url_string);
+    // println!("c_c_t_c: url_string {}", url_string);
 
     let mut client_cert = PathBuf::from(&key_dir);
     let mut client_key = PathBuf::from(&key_dir);
@@ -495,17 +487,6 @@ async fn client_create_tls_channel<'a>(
     // Get CA certificate
     let pem = tokio::fs::read(ca_cert).await?;
     let ca = tonic::transport::Certificate::from_pem(pem);
-
-    /*
-    // Create identify from key and certificate
-    let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
-    let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
-    let id = tonic::transport::Identity::from_pem(cert, key);
-
-    // Get CA certificate 
-    let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
-    let ca = tonic::transport::Certificate::from_pem(pem);
-    */
 
     // Telling our client what is the identity of our server
     let tls = tonic::transport::ClientTlsConfig::new()
@@ -568,7 +549,7 @@ async fn image_create_tls_channel<'a>(
     let str_front = "http://";
 
     let url_string = format!("{}{}:{}", str_front, server_address, server_port);
-    println!("url_string {}", url_string);
+    // println!("i_c_t_c: url_string {}", url_string);
 
     let mut client_cert = PathBuf::from(&key_dir);
     let mut client_key = PathBuf::from(&key_dir);
@@ -589,17 +570,6 @@ async fn image_create_tls_channel<'a>(
     // Get CA certificate
     let pem = tokio::fs::read(ca_cert).await?;
     let ca = tonic::transport::Certificate::from_pem(pem);
-
-    /* 
-    // Create identify from key and certificate
-    let cert = tokio::fs::read("grpc_tls_keys/client.pem").await?;
-    let key = tokio::fs::read("grpc_tls_keys/client.key").await?;
-    let id = tonic::transport::Identity::from_pem(cert, key);
-
-    // Get CA certificate 
-    let pem = tokio::fs::read("grpc_tls_keys/ca.pem").await?;
-    let ca = tonic::transport::Certificate::from_pem(pem);
-    */
 
     // Telling our client what is the identity of our server
     let tls = tonic::transport::ClientTlsConfig::new()
@@ -650,6 +620,85 @@ async fn create_grpctls_image(
     }
 }
 
+async fn health_create_tls_channel<'a>(
+    key_dir: String,
+    server_address: &'a str,
+    server_port: &'a str,
+) -> Result<HealthClient<tonic::transport::Channel>> {
+    let str_front = "http://";
+
+    let url_string = format!("{}{}:{}", str_front, server_address, server_port);
+    // println!("h_c_t_c: url_string {}", url_string);
+
+    let mut client_cert = PathBuf::from(&key_dir);
+    let mut client_key = PathBuf::from(&key_dir);
+    let mut ca_cert = PathBuf::from(&key_dir);
+    client_cert.push("client.pem");
+    client_key.push("client.key");
+    ca_cert.push("ca.pem");
+
+    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
+    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
+
+    // Create identify from key and certificate
+    let cert = tokio::fs::read(client_cert).await?;
+    let key = tokio::fs::read(client_key).await?;
+    let id = tonic::transport::Identity::from_pem(cert, key);
+
+    // Get CA certificate
+    let pem = tokio::fs::read(ca_cert).await?;
+    let ca = tonic::transport::Certificate::from_pem(pem);
+
+    // Telling our client what is the identity of our server
+    let tls = tonic::transport::ClientTlsConfig::new()
+        .domain_name("localhost")
+        .identity(id.clone())
+        .ca_certificate(ca.clone());
+
+    let channel = tonic::transport::Channel::from_shared(url_string.clone().to_string()).unwrap();
+    let channel = channel.tls_config(tls)?.connect().await?;
+    let client: HealthClient<tonic::transport::Channel> = HealthClient::new(channel);
+
+    Ok(client)
+}
+
+async fn create_grpctls_health(
+    key_dir: String,
+    server_address: String,
+    _hybrid_vsock_port: u64,
+    _hybrid_vsock: bool,
+) -> Result<HealthClient<tonic::transport::Channel>> {
+    let fields: Vec<&str> = server_address.split("://").collect();
+
+    if fields.len() != 2 {
+        return Err(anyhow!("invalid server address URI"));
+    }
+
+    let scheme = fields[0].to_lowercase();
+
+    match scheme.as_str() {
+        // Format: "ipaddr://ip:port"
+        "ipaddr" => {
+            let addr: Vec<&str> = fields[1].split(':').collect();
+
+            let ip_address = addr[0];
+
+            let port: u32 = match addr[1].parse::<u32>() {
+                Ok(r) => r,
+                Err(e) => {
+                    println!("Error with port");
+                    return Err(anyhow!(e).context("IPADDR port is not numeric"));
+                }
+            };
+
+            let channel = health_create_tls_channel(key_dir, &ip_address, &port.to_string()).await?;
+            Ok(channel)
+        }
+        _ => return Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
+    }
+}
+
 async fn kata_service_agent(
     key_dir: String,
     server_address: String,
@@ -669,6 +718,17 @@ async fn kata_service_image(
 ) -> Result<(ImageClient<tonic::transport::Channel>, i32)> {
     let grpc_channel =
         create_grpctls_image(key_dir, server_address, hybrid_vsock_port, hybrid_vsock).await?;
+    Ok((grpc_channel, 3))
+}
+
+async fn kata_service_health(
+    key_dir: String,
+    server_address: String,
+    hybrid_vsock_port: u64,
+    hybrid_vsock: bool,
+) -> Result<(HealthClient<tonic::transport::Channel>, i32)> {
+    let grpc_channel =
+        create_grpctls_health(key_dir, server_address, hybrid_vsock_port, hybrid_vsock).await?;
     Ok((grpc_channel, 3))
 }
 
@@ -725,6 +785,18 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
     };
 
     let (image, _val) = match kata_service_image(
+        cfg.key_dir.clone(),
+        cfg.server_address.clone(),
+        cfg.hybrid_vsock_port,
+        cfg.hybrid_vsock,
+    )
+    .await
+    {
+        Ok((v, v2)) => (v, v2),
+        Err(e) => return Err(anyhow!(e).context("Error setting tls channel")),
+    };
+
+    let (health, _val) = match kata_service_health(
         cfg.key_dir.clone(),
         cfg.server_address.clone(),
         cfg.hybrid_vsock_port,
@@ -797,7 +869,7 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
         let result = handle_cmd(
             cfg,
             client.clone(),
-            2,
+            health.clone(),
             image.clone(),
             &ttrpc_ctx,
             repeat_count,
@@ -838,7 +910,7 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
 async fn handle_cmd(
     _cfg: &Config,
     client: SecAgentServiceClient<tonic::transport::Channel>,
-    health: i32,
+    health: HealthClient<tonic::transport::Channel>,
     image: ImageClient<tonic::transport::Channel>,
     ctx: &Context,
     repeat_count: i64,
@@ -891,7 +963,7 @@ async fn handle_cmd(
             result = handle_agent_cmd(
                 ctx,
                 client.clone(),
-                health,
+                health.clone(),
                 image.clone(),
                 options,
                 cmd,
@@ -963,7 +1035,7 @@ fn handle_builtin_cmd(_cmd: &str, _args: &str) -> Result<bool> {
 async fn handle_agent_cmd(
     ctx: &Context,
     client: SecAgentServiceClient<tonic::transport::Channel>,
-    health: i32, // set Agent for now:  &HealthClient
+    health: HealthClient<tonic::transport::Channel>,
     image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     cmd: &str,
@@ -976,6 +1048,12 @@ async fn handle_agent_cmd(
         Err(e) => return Err(e),
     };
     match fname {
+
+        "CloseStdin" => { 
+            let _result =
+                agent_cmd_container_close_stdin(ctx, client, health, image, options, args).await?;
+        }
+
         "CreateContainer" => {
             let _result =
                 agent_cmd_container_create(ctx, client, health, image, options, args).await?;
@@ -1019,8 +1097,59 @@ async fn handle_agent_cmd(
             let _result = agent_cmd_container_wait_process(ctx, client, health, image, options, args).await?;
         }
 
+        "ListInterfaces" => {
+            let _result = agent_cmd_sandbox_list_interfaces(ctx, client, health, image, options, args).await?;
+        }
+
+        "ListRoutes" => {
+            let _result = 
+                agent_cmd_sandbox_list_routes(ctx, client, health, image, options, args).await?;
+        }
+
+        "GetMetrics" => {
+            let _result = agent_cmd_sandbox_get_metrics(ctx, client, health, image, options, args).await?;
+        }
+
+        "ReadStderr" => {
+            let _result = agent_cmd_container_read_stderr(ctx, client, health, image, options, args).await?;
+        }
+
+        "ReadStdout" => {
+            let _result = agent_cmd_container_read_stdout(ctx, client, health, image, options, args).await?;
+        }
+
+        "ReseedRandomDev" => {
+            let _result = agent_cmd_sandbox_reseed_random_dev(ctx, client, health, image, options, args).await?;
+        }
+
+        "SetGuestDateTime" => {
+            let _result = agent_cmd_sandbox_set_guest_date_time(ctx, client, health, image, options, args).await?;
+        }
+
+        "TtyWinResize" => {
+            let _result = agent_cmd_container_tty_win_resize(ctx, client, health, image, options, args).await?;
+        }
+
+        "GetOOMEvent" => {
+            let _result = agent_cmd_sandbox_get_oom_event(ctx, client, health, image, options, args).await?;
+        }
+
+        "UpdateContainer" => {
+            let _result = agent_cmd_sandbox_update_container(ctx, client, health, image, options, args).await?;
+        }
+
         "PullImage" => {
             let _result = agent_cmd_pull_image(ctx, client, health, image, options, args).await?;
+        }
+        "Check" => {
+            let _result = agent_cmd_health_check(ctx, client, health, image, options, args).await?;
+        }
+        "Version" => {
+            let _result = agent_cmd_health_version(ctx, client, health, image, options, args).await?;
+        }
+
+        "WriteStdin" => {
+            let _result = agent_cmd_container_write_stdin(ctx, client, health, image, options, args).await?;
         }
 
         _ => println!("No command "),
@@ -1038,7 +1167,7 @@ fn interactive_client_loop(
     //client: &AgentServiceClient,
     //client: &SecAgentServiceClient<Channel>,
     client: &impl Future<Output = SecAgentServiceClient<Channel>>,
-    health: i32,
+    health: HealthClient<tonic::transport::Channel>,
     image: i32,
     //health: &HealthClient,
     //image: &ImageClient,
@@ -1107,24 +1236,25 @@ fn readline(prompt: &str) -> std::result::Result<String, String> {
     Ok(line.trim_end().to_string())
 }
 
-/*
-fn agent_cmd_health_check(
+async fn agent_cmd_health_check(
     ctx: &Context,
-    _client: &AgentServiceClient,
-    health: &HealthClient,
+    _client: SecAgentServiceClient<tonic::transport::Channel>,
+    mut health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let req: CheckRequest = utils::make_request(args)?;
+    let req: grpctls::CheckRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
+    let reply = health.check(req).await?.into_inner();
+    /*
     let reply = health
         .check(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    */
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1132,10 +1262,11 @@ fn agent_cmd_health_check(
     Ok(())
 }
 
-fn agent_cmd_health_version(
+async fn agent_cmd_health_version(
     ctx: &Context,
-    _client: &AgentServiceClient,
-    health: &HealthClient,
+    _client: SecAgentServiceClient<tonic::transport::Channel>,
+    mut health: HealthClient<tonic::transport::Channel>,
+    //health: &HealthClient,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
@@ -1143,25 +1274,25 @@ fn agent_cmd_health_version(
     // XXX: Yes, the API is actually broken!
     let req: CheckRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
+    let reply = health.version(req).await?.into_inner();
+    /*
     let reply = health
         .version(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
-*/
 
 async fn agent_cmd_container_create(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -1225,7 +1356,7 @@ async fn agent_cmd_container_create(
 async fn agent_cmd_container_list(
     _ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     _args: &str,
@@ -1244,7 +1375,7 @@ async fn agent_cmd_container_list(
 async fn agent_cmd_container_remove(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -1276,7 +1407,7 @@ async fn agent_cmd_container_remove(
 async fn agent_cmd_container_exec(
     _ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
@@ -1362,7 +1493,7 @@ fn agent_cmd_container_stats(
 async fn agent_cmd_container_pause(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     //_health: &HealthClient,
     options: &mut Options,
@@ -1390,7 +1521,7 @@ async fn agent_cmd_container_pause(
 async fn agent_cmd_container_resume(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -1419,7 +1550,7 @@ async fn agent_cmd_container_resume(
 async fn agent_cmd_container_start(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     //health: &HealthClient,
     options: &mut Options,
@@ -1478,35 +1609,12 @@ fn agent_cmd_sandbox_get_guest_details(
 
     Ok(())
 }
-
-fn agent_cmd_sandbox_get_ip_tables(
-    ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
-    _image: ImageClient<tonic::transport::Channel>,
-    _options: &mut Options,
-    args: &str,
-) -> Result<()> {
-    let req: GetIPTablesRequest = utils::make_request(args)?;
-
-    let ctx = clone_context(ctx);
-
-    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
-    let reply = client
-        .get_ip_tables(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-
-    Ok(())
-}
 */
+
 async fn agent_cmd_container_wait_process(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -1536,7 +1644,7 @@ async fn agent_cmd_container_wait_process(
 async fn agent_cmd_container_signal_process(
     ctx: &Context,
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -1583,48 +1691,53 @@ async fn agent_cmd_container_signal_process(
     Ok(())
 }
 
-/*
-fn agent_cmd_sandbox_list_interfaces(
+async fn agent_cmd_sandbox_list_interfaces(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let req: ListInterfacesRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.list_interfaces(req).await?.into_inner();
+
+    /*
     let reply = client
         .list_interfaces(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+     */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_sandbox_list_routes(
+async fn agent_cmd_sandbox_list_routes(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let req: ListRoutesRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.list_routes(req).await?.into_inner();
+    /*
     let reply = client
         .list_routes(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    */
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1632,24 +1745,24 @@ fn agent_cmd_sandbox_list_routes(
     Ok(())
 }
 
-fn agent_cmd_container_tty_win_resize(
+async fn agent_cmd_container_tty_win_resize(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let mut req: TtyWinResizeRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     run_if_auto_values!(ctx, || -> Result<()> {
         let cid = utils::get_option("cid", options, args)?;
         let exec_id = utils::get_option("exec_id", options, args)?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
+        req.container_id = cid;
+        req.exec_id = exec_id;
 
         let rows_str = utils::get_option("row", options, args)?;
 
@@ -1657,7 +1770,7 @@ fn agent_cmd_container_tty_win_resize(
             let rows = rows_str
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid row size"))?;
-            req.set_row(rows);
+            req.row = rows;
         }
 
         let cols_str = utils::get_option("column", options, args)?;
@@ -1667,7 +1780,7 @@ fn agent_cmd_container_tty_win_resize(
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid column size"))?;
 
-            req.set_column(cols);
+            req.column = cols;
         }
 
         Ok(())
@@ -1675,54 +1788,60 @@ fn agent_cmd_container_tty_win_resize(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.tty_win_resize(req).await?.into_inner();
+    /*
     let reply = client
         .tty_win_resize(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_container_close_stdin(
+async fn agent_cmd_container_close_stdin(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let mut req: CloseStdinRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     run_if_auto_values!(ctx, || -> Result<()> {
         let cid = utils::get_option("cid", options, args)?;
         let exec_id = utils::get_option("exec_id", options, args)?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
+        req.container_id = cid;
+        req.exec_id = exec_id;
 
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.close_stdin(req).await?.into_inner();
+
+    /*
     let reply = client
         .close_stdin(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
 
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_container_read_stdout(
+async fn agent_cmd_container_read_stdout(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -1735,8 +1854,8 @@ fn agent_cmd_container_read_stdout(
         let cid = utils::get_option("cid", options, args)?;
         let exec_id = utils::get_option("exec_id", options, args)?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
+        req.container_id = cid;
+        req.exec_id = exec_id;
 
         let length_str = utils::get_option("len", options, args)?;
 
@@ -1744,7 +1863,7 @@ fn agent_cmd_container_read_stdout(
             let length = length_str
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid length"))?;
-            req.set_len(length);
+            req.len = length;
         }
 
         Ok(())
@@ -1752,34 +1871,36 @@ fn agent_cmd_container_read_stdout(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.read_stdout(req).await?.into_inner();
+    /*
     let reply = client
         .read_stdout(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_container_read_stderr(
+async fn agent_cmd_container_read_stderr(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let mut req: ReadStreamRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     run_if_auto_values!(ctx, || -> Result<()> {
         let cid = utils::get_option("cid", options, args)?;
         let exec_id = utils::get_option("exec_id", options, args)?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
+        req.container_id = cid;
+        req.exec_id = exec_id;
 
         let length_str = utils::get_option("len", options, args)?;
 
@@ -1787,7 +1908,7 @@ fn agent_cmd_container_read_stderr(
             let length = length_str
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid length"))?;
-            req.set_len(length);
+            req.len =  length;
         }
 
         Ok(())
@@ -1795,27 +1916,29 @@ fn agent_cmd_container_read_stderr(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.read_stderr(req).await?.into_inner();
+    /*
     let reply = client
         .read_stderr(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+    */ 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_container_write_stdin(
+async fn agent_cmd_container_write_stdin(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let mut req: WriteStreamRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     run_if_auto_values!(ctx, || -> Result<()> {
         let cid = utils::get_option("cid", options, args)?;
@@ -1824,96 +1947,83 @@ fn agent_cmd_container_write_stdin(
         let str_data = utils::get_option("data", options, args)?;
         let data = utils::str_to_bytes(&str_data)?;
 
-        req.set_container_id(cid);
-        req.set_exec_id(exec_id);
-        req.set_data(data.to_vec());
+        req.container_id = cid;
+        req.exec_id = exec_id;
+        req.data = data.to_vec();
 
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.write_stdin(req).await?.into_inner();
+    /*
     let reply = client
         .write_stdin(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
 
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_sandbox_get_metrics(
+async fn agent_cmd_sandbox_get_metrics(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
     let req: GetMetricsRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.get_metrics(req).await?.into_inner();
+    /*
     let reply = client
         .get_metrics(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_sandbox_get_oom_event(
+async fn agent_cmd_sandbox_get_oom_event(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let req: GetOOMEventRequest = utils::make_request(args)?;
+    let req: GetOomEventRequest = utils::make_request(args)?;
 
-    let ctx = clone_context(ctx);
+    let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.get_oom_event(req).await?.into_inner();
+
+    /*
     let reply = client
         .get_oom_event(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
+    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
 
-fn agent_cmd_sandbox_get_volume_stats(
-    ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
-    _image: ImageClient<tonic::transport::Channel>,
-    _options: &mut Options,
-    args: &str,
-) -> Result<()> {
-    let req: VolumeStatsRequest = utils::make_request(args)?;
-
-    let ctx = clone_context(ctx);
-
-    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
-    let reply = client
-        .get_volume_stats(ctx, &req)
-        .map_err(|e| anyhow!(e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-
-    Ok(())
-}
+/*
+f
 
 fn agent_cmd_sandbox_copy_file(
     ctx: &Context,
@@ -2011,11 +2121,12 @@ fn agent_cmd_sandbox_copy_file(
 
     Ok(())
 }
+*/
 
-fn agent_cmd_sandbox_reseed_random_dev(
+async fn agent_cmd_sandbox_reseed_random_dev(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -2028,16 +2139,21 @@ fn agent_cmd_sandbox_reseed_random_dev(
         let str_data = utils::get_option("data", options, args)?;
         let data = utils::str_to_bytes(&str_data)?;
 
-        req.set_data(data.to_vec());
+        // req.set_data(data.to_vec());
+        req.data = data.to_vec();
 
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.reseed_random_dev(req).await?.into_inner();
+
+    /*
     let reply = client
         .reseed_random_dev(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    */
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -2045,46 +2161,11 @@ fn agent_cmd_sandbox_reseed_random_dev(
     Ok(())
 }
 
-fn agent_cmd_sandbox_online_cpu_mem(
-        let nb_cpus_str = utils::get_option("nb_cpus", options, args)?;
 
-        if !nb_cpus_str.is_empty() {
-            let nb_cpus = nb_cpus_str
-                .parse::<u32>()
-                .map_err(|e| anyhow!(e).context("invalid nb_cpus value"))?;
-
-            req.set_nb_cpus(nb_cpus);
-        }
-
-        let cpu_only_str = utils::get_option("cpu_only", options, args)?;
-
-        if !cpu_only_str.is_empty() {
-            let cpu_only = cpu_only_str
-                .parse::<bool>()
-                .map_err(|e| anyhow!(e).context("invalid cpu_only bool"))?;
-
-            req.set_cpu_only(cpu_only);
-        }
-
-        Ok(())
-    });
-
-    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
-    let reply = client
-        .online_cpu_mem(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-
-    Ok(())
-}
-
-fn agent_cmd_sandbox_set_guest_date_time(
+async fn agent_cmd_sandbox_set_guest_date_time(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -2101,7 +2182,7 @@ fn agent_cmd_sandbox_set_guest_date_time(
                 .parse::<i64>()
                 .map_err(|e| anyhow!(e).context("invalid seconds"))?;
 
-            req.set_Sec(secs);
+            req.sec = secs;
         }
 
         let usecs_str = utils::get_option("usec", options, args)?;
@@ -2111,7 +2192,7 @@ fn agent_cmd_sandbox_set_guest_date_time(
                 .parse::<i64>()
                 .map_err(|e| anyhow!(e).context("invalid useconds"))?;
 
-            req.set_Usec(usecs);
+            req.usec = usecs;
         }
 
         Ok(())
@@ -2119,9 +2200,13 @@ fn agent_cmd_sandbox_set_guest_date_time(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    /* 
     let reply = client
         .set_guest_date_time(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    */
+
+    let reply = client.set_guest_date_time(req).await?.into_inner();
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -2129,34 +2214,10 @@ fn agent_cmd_sandbox_set_guest_date_time(
     Ok(())
 }
 
-fn agent_cmd_sandbox_set_ip_tables(
+async fn agent_cmd_sandbox_update_container(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
-    _image: ImageClient<tonic::transport::Channel>,
-    _options: &mut Options,
-    args: &str,
-) -> Result<()> {
-    let req: SetIPTablesRequest = utils::make_request(args)?;
-
-    let ctx = clone_context(ctx);
-
-    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
-    let reply = client
-        .set_ip_tables(ctx, &req)
-        .map_err(|e| anyhow!(e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-
-    Ok(())
-}
-
-fn agent_cmd_sandbox_update_container(
-    ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -2168,7 +2229,7 @@ fn agent_cmd_sandbox_update_container(
     run_if_auto_values!(ctx, || -> Result<()> {
         let cid = utils::get_option("cid", options, args)?;
 
-        req.set_container_id(cid);
+        req.container_id = cid;
 
         Ok(())
     });
@@ -2178,72 +2239,23 @@ fn agent_cmd_sandbox_update_container(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.update_container(req).await?.into_inner();
+    /*
     let reply = client
         .update_container(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+     */
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
-
-fn agent_cmd_sandbox_mem_hotplug_by_probe(
-    ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
-    _image: ImageClient<tonic::transport::Channel>,
-    options: &mut Options,
-    args: &str,
-) -> Result<()> {
-    let mut req: MemHotplugByProbeRequest = utils::make_request(args)?;
-
-    let ctx = clone_context(ctx);
-
-    // Expected to be a comma separated list of hex addresses
-    let addr_list = utils::get_option("memHotplugProbeAddr", options, args)?;
-
-    run_if_auto_values!(ctx, || -> Result<()> {
-        if !addr_list.is_empty() {
-            let addrs: Vec<u64> = addr_list
-                // Convert into a list of string values.
-                .split(',')
-                // Convert each string element into a u8 array of bytes, ignoring
-                // those elements that fail the conversion.
-                .filter_map(|s| hex::decode(s.trim_start_matches("0x")).ok())
-                // "Stretch" the u8 byte slice into one of length 8
-                // (to allow each 8 byte chunk to be converted into a u64).
-                .map(|mut v| -> Vec<u8> {
-                    v.resize(8, 0x0);
-                    v
-                })
-                // Convert the slice of u8 bytes into a u64
-                .map(|b| byteorder::LittleEndian::read_u64(&b))
-                .collect();
-
-            req.set_memHotplugProbeAddr(addrs);
-        }
-
-        Ok(())
-    });
-
-    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
-    let reply = client
-        .mem_hotplug_by_probe(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-
-    Ok(())
-}
-*/
 
 async fn agent_cmd_pull_image(
     ctx: &Context,
     _client: SecAgentServiceClient<tonic::transport::Channel>,
-    _health: i32,
+    _health: HealthClient<tonic::transport::Channel>,
     mut image_client: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -2347,31 +2359,3 @@ fn get_repeat_count(cmdline: &str) -> i64 {
         Err(_) => default_repeat_count,
     }
 }
-
-/*
-fn agent_cmd_sandbox_add_swap(
-    ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
-    _image: &ImageClient,
-    _options: &mut Options,
-    _args: &str,
-) -> Result<()> {
-    let req = AddSwapRequest::default();
-
-    let ctx = clone_context(ctx);
-
-    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-
-    let reply = client
-        .add_swap(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    // FIXME: Implement 'AddSwap' fully.
-    eprintln!("FIXME: 'AddSwap' not fully implemented");
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-
-    Ok(())
-} */
