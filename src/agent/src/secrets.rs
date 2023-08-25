@@ -13,12 +13,13 @@ use tokio::fs;
 
 use anyhow::Result;
 use crate::AGENT_CONFIG;
+/* Sample */
 use attestation_agent::AttestationAPIs;
 use attestation_agent::AttestationAgent;
 
+
 /// Attestation Agent's GetResource gRPC address.
 /// It's given <https://github.com/confidential-containers/attestation-agent#run>
-//pub const AA_GETRESOURCE_ADDR: &str = "http://127.0.0.1:50001";
 pub const TLS_KEYS_CONFIG_DIR: &str = "/run/tls-keys";
 pub const TLS_KEYS_FILE_PATH: &str = "/run/tls-keys/tls-key.zip";
 pub const KBS_RESOURCE_PATH: &str = "/default/tenant-keys/tls-keys.zip";
@@ -109,16 +110,15 @@ impl Retriever {
         }
 
         info!(sl!(), "get_tls_key: kbc_name: {}", &self.kbc_name);
-        info!(sl!(), "get_tts_key: kbc_uri: {}", &self.kbs_uri);
+        info!(sl!(), "get_tls_key: kbc_uri: {}", &self.kbs_uri);
         info!(sl!(), "get_tls_key: KBS_RESOURCE_PATH: {}", KBS_RESOURCE_PATH);
 
-        // FIXME: Hard-coded sample attester for now 
+        // FIXME: Hard-coded sample attester for now! 
         let key = "AA_SAMPLE_ATTESTER_TEST";
         env::set_var(key, "yes");
         if env::var(key).is_ok() {
             info!(sl!() ,"get_tls_key: AA_SAMPLE_ATTESTER_TEST is set!");
         }
-
         // obtain the tls keys from KBS through attestation agent
         let mut attestation_agent = AttestationAgent::new();
 
@@ -142,7 +142,8 @@ impl Retriever {
 }
 
 pub async fn retrieve_secrets() -> Result<()> {
-    let aa_kbc_params = &AGENT_CONFIG.read().await.aa_kbc_params;
+    let aa_kbc_params = &AGENT_CONFIG.aa_kbc_params;
+
     if !aa_kbc_params.is_empty() {
         let resource_config = format!("provider:attestation-agent:{}", aa_kbc_params);
         if let Some(wrapped_aa_kbc_params) = &Some(&resource_config) {

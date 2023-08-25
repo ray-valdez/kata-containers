@@ -290,7 +290,7 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
         .type_attribute("Linux", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .field_attribute("UIDMappings", "#[serde (rename = \"UIDMappings\")]")
         .field_attribute("GIDMappings", "#[serde (rename = \"GIDMappings\")]")
-        .field_attribute("type", "#[serde (rename(serialize = \"field_type\", deserialize = \"field_type\"))]")
+        .field_attribute("type", "#[serde (rename(serialize = \"type\", deserialize = \"type\"))]")
         .type_attribute("LinuxIntelRdt", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("LinuxResources", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")
         .type_attribute("LinuxIDMapping", "#[derive(serde::Deserialize, serde::Serialize)] #[serde(rename_all = \"PascalCase\")] ")

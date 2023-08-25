@@ -418,7 +418,7 @@ async fn start_sandbox(
 
     // if the tls keys are downloaded and extracted, then start the grpctls server
     if secrets::tls_keys_exist() {
-        let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode)?;
+        let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
         gserver.await?;
     }
 

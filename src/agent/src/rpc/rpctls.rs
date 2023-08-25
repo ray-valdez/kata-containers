@@ -6,22 +6,18 @@
 use tokio::sync::Mutex;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
-
 use protocols::agent; 
+
 use crate::random;
 use crate::sandbox::Sandbox;
 use crate::image_rpc::ImageService;
 use crate::metrics::get_metrics as other_get_metrics;
 use crate::version::{AGENT_VERSION, API_VERSION};
 use rustjail::container::{BaseContainer, Container};
-use serde_json::Value;
-use serde_json::json;
-
-
 
 use libc::{self, c_ushort, winsize, TIOCSWINSZ};
 use std::fs;
-use std::io::{self, ErrorKind};
+use std::io::{self};
 use std::net::SocketAddr;
 
 use nix::errno::Errno;
@@ -381,7 +377,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                         tonic::Code::Internal,
                         format!("{:?}", e)
                 )})?;
-        let status = response.get_status();
+        let status = response.status();
         Ok(tonic::Response:: new(WaitProcessResponse{status,
         }))
     }
@@ -406,7 +402,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                         format!("{:?}", e)
                 )})?;
 
-        let len = response.get_len();
+        let len = response.len();
 
         Ok(tonic::Response:: new(WriteStreamResponse{len: len}))
     }
@@ -431,7 +427,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                         format!("{:?}", e)
                 )})?;
 
-        let data = response.get_data();
+        let data = response.data();
 
         Ok(tonic::Response:: new(ReadStreamResponse{data: data.to_vec()}))
     }
@@ -482,7 +478,7 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                         format!("{:?}", e)
                 )})?;
 
-        let data = response.get_data();
+        let data = response.data();
 
         Ok(tonic::Response:: new(ReadStreamResponse{data: data.to_vec()}))
     }
@@ -722,7 +718,7 @@ fn from_file(file_path: &str) -> Result<String> {
 }
 
 fn convert_routes(route_str: String) -> Result< Vec<types::Route>, io::Error> {
-
+    /*
     let mut val: Value = match serde_json::from_str::<serde_json::Value>(&route_str)
      {
         Ok(v) => v,
@@ -757,11 +753,14 @@ fn convert_routes(route_str: String) -> Result< Vec<types::Route>, io::Error> {
     }
 
     let g_route: Vec<types::Route> = serde_json::from_value(val).unwrap();
+    */
+    let g_route: Vec<types::Route> = serde_json::from_str(&route_str).unwrap();
     Ok(g_route)
 }
 
 fn convert_interface(interface_str: String) -> Result< Vec<types::Interface>, io::Error> {
 
+    /*
     let mut v: Value = match serde_json::from_str::<serde_json::Value>(&interface_str)
     {
         Ok(v) => v,
@@ -800,22 +799,20 @@ fn convert_interface(interface_str: String) -> Result< Vec<types::Interface>, io
         }
     }
     let g_interface: Vec<types::Interface> = serde_json::from_value(v).unwrap();
+    */
+    let g_interface: Vec<types::Interface> = serde_json::from_str(&interface_str).unwrap();
     Ok(g_interface)
 }
 
-pub fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool) ->
+pub async fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:bool) ->
     Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
 
     let sec_agent = AgentService { sandbox: s.clone(), init_mode,  };
     let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);    
 
-    let image_service = ImageService::new(s);
+    let image_service = ImageService::new(s).await;
     let iservice = grpctls::image_server::ImageServer::new(image_service);
 
-    // let health_service = HealthService::new();
-    //let health_service = Box::new(HealthService{}) as Box<dyn grpctls::health_server::Health + Send + Sync > ;
-
-    //let health_service = Box::new(HealthService{});
     let health_service = HealthService{};
     let hservice = grpctls::health_server::HealthServer::new(health_service);
 
