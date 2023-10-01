@@ -26,8 +26,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(1);
     });
 
-    println!("sandbox address: {}", config.address);
-    println!("container_id:    {}", config.cid);
     let str_front = "http://";
     let str_end = SERVER_PORT.to_string();
 

@@ -71,7 +71,7 @@
 		"noNewPrivileges": true
 	},
 	"root": {
-		"path": "/rootfs",
+		"path": "ROOTFS_PATH",
 		"readonly": true
 
 	},
@@ -138,28 +138,16 @@
 				"nodev",
 				"ro"
 			]
-		},
-		{
-			"destination": "/sys/fs/cgroup",
-			"type": "cgroup",
-			"source": "cgroup",
-			"options": [
-				"nosuid",
-				"noexec",
-				"nodev",
-				"relatime",
-				"ro"
-			]
 		}
 	],
 	"annotations": {
 			"io.katacontainers.pkg.oci.container_type": "pod_container",
-			"io.kubernetes.cri.sandbox-id": "330ab64dfad595fd91ebaeae4f6c417d2da7dc1b75e71690c56cf5be9e9fb5fb",
-			"io.kubernetes.cri.image-name": "ghcr.io/ray-valdez/alpine-encrypted",
+			"io.kubernetes.cri.sandbox-id": SANDBOX_ID,
+			"io.kubernetes.cri.image-name": IMAGE_NAME ,
 			"io.kubernetes.cri.container-type": "container",
-			"io.kubernetes.cri.container-name": "alpine",
+			"io.kubernetes.cri.container-name": CONTAINER_NAME,
 			"io.kubernetes.cri.sandbox-namespace": "default",
-			"io.kubernetes.cri.sandbox-name": "ngnix-sandbox"
+			"io.kubernetes.cri.sandbox-name": SANDBOX_NAME 
 	},
 	"linux": {
 		"resources": {

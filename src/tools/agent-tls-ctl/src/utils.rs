@@ -344,7 +344,7 @@ fn mount_oci_to_ttrpc(m: &ociMount) -> ttrpcMount {
     ttrpcMount {
         destination: m.destination.clone(),
         source: m.source.clone(),
-        type_: m.r#type.clone(),
+        type_: (m.r#type.clone()),
         options: ttrpc_options,
         ..Default::default()
     }
@@ -674,6 +674,14 @@ fn oci_to_ttrpc(bundle_dir: &str, cid: &str, oci: &ociSpec) -> Result<ttrpcSpec>
         mounts.push(mount_oci_to_ttrpc(m));
     }
 
+    // Added annotation support
+    let mut annotations = HashMap::new();
+
+    for anno in &oci.annotations {
+        debug!(sl!(), "ANNO {}={}", anno.0, anno.1);
+        annotations.insert(anno.0.to_string(), anno.1.to_string());
+    }
+
     let linux = match &oci.linux {
         Some(l) => protobuf::MessageField::some(linux_oci_to_ttrpc(l)),
         None => protobuf::MessageField::none(),
@@ -694,7 +702,7 @@ fn oci_to_ttrpc(bundle_dir: &str, cid: &str, oci: &ociSpec) -> Result<ttrpcSpec>
         Hostname: hostname,
         Mounts: mounts,
         Hooks: protobuf::MessageField::none(),
-        Annotations: HashMap::new(),
+        Annotations: annotations,
         Linux: linux,
         Solaris: protobuf::MessageField::none(),
         Windows: protobuf::MessageField::none(),
