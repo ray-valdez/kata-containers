@@ -34,8 +34,8 @@ use grpctls::health_client::HealthClient;
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
 
 use grpctls::{
-    PullImageRequest, CloseStdinRequest, CreateContainerRequest, ExecProcessRequest, GetMetricsRequest, GetOomEventRequest, ListContainersRequest,
-    ListInterfacesRequest, ListRoutesRequest, PauseContainerRequest, ReadStreamRequest, RemoveContainerRequest, ReseedRandomDevRequest, ResumeContainerRequest,
+    CopyFileRequest, PullImageRequest, CloseStdinRequest, CreateContainerRequest, ExecProcessRequest, GetMetricsRequest, GetOomEventRequest, ListContainersRequest,
+    ListInterfacesRequest, ListRoutesRequest, OnlineCpuMemRequest, PauseContainerRequest, ReadStreamRequest, RemoveContainerRequest, ReseedRandomDevRequest, ResumeContainerRequest,
     SetGuestDateTimeRequest, StartContainerRequest, SignalProcessRequest, TtyWinResizeRequest, WaitProcessRequest, WriteStreamRequest, UpdateContainerRequest,
     CheckRequest
 };
@@ -168,13 +168,10 @@ static AGENT_CMDS: &[AgentCmd] = &[
         name: "CloseStdin",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "CopyFile",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_copy_file,
     },
-    */
     AgentCmd {
         name: "CreateContainer",
         st: ServiceType::Agent,
@@ -222,6 +219,10 @@ static AGENT_CMDS: &[AgentCmd] = &[
         name: "ListRoutes",
         st: ServiceType::Agent,
     }, 
+    AgentCmd {
+        name: "OnlineCPUMem",
+        st: ServiceType::Agent,
+    },
     AgentCmd {
         name: "PauseContainer",
         st: ServiceType::Agent,
@@ -1126,12 +1127,20 @@ async fn handle_agent_cmd(
             let _result = agent_cmd_sandbox_set_guest_date_time(ctx, client, health, image, options, args).await?;
         }
 
+        "OnlineCPUMem" => {
+            let _result = agent_cmd_sandbox_online_cpu_mem(ctx, client, health, image, options, args).await?;
+        }
+
         "TtyWinResize" => {
             let _result = agent_cmd_container_tty_win_resize(ctx, client, health, image, options, args).await?;
         }
 
         "GetOOMEvent" => {
             let _result = agent_cmd_sandbox_get_oom_event(ctx, client, health, image, options, args).await?;
+        }
+
+        "CopyFile" => {
+            let _result = agent_cmd_sandbox_copy_file(ctx, client, health, image, options, args).await?;
         }
 
         "UpdateContainer" => {
@@ -1308,8 +1317,13 @@ async fn agent_cmd_container_create(
         let exec_id = utils::get_option("exec_id", options, args)?;
 
         let ttrpc_spec = utils::get_ttrpc_spec(options, &cid).map_err(|e| anyhow!(e))?;
+        debug!(sl!(), "PRINT00"; "OBJ tls_spec" =>format!("{:?}", ttrpc_spec));
+
         let jstr = serde_json::to_string(&ttrpc_spec)?;
+        debug!(sl!(), "JSTR STR oci_spec"; "STR" => format!("{:?}", &jstr));
+
         let tls_spec: grpctls::Spec = serde_json::from_str::<grpctls::Spec>(&jstr)?;
+        debug!(sl!(), "PRINT 001"; "OBj from STR" => format!("{:?}", tls_spec));
 
         req.container_id = cid;
         req.exec_id = exec_id;
@@ -1344,6 +1358,8 @@ async fn agent_cmd_container_create(
 
         let oci_obj = req.oci.unwrap();
         let oci_str = serde_json::to_string(&oci_obj)?;
+        debug!(sl!(), "STR oci_spec"; "STR" => format!("{:?}", &oci_str));
+
         let oci_spec: protocols::oci::Spec = serde_json::from_str(&oci_str)?;
         //debug!(sl!(), "K_T02 oci_ttprc"; "STR" => format!("{:?}", oci_spec));
 
@@ -2022,13 +2038,10 @@ async fn agent_cmd_sandbox_get_oom_event(
     Ok(())
 }
 
-/*
-f
-
-fn agent_cmd_sandbox_copy_file(
+async fn agent_cmd_sandbox_copy_file(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
@@ -2040,7 +2053,7 @@ fn agent_cmd_sandbox_copy_file(
     run_if_auto_values!(ctx, || -> Result<()> {
         let path = utils::get_option("path", options, args)?;
         if !path.is_empty() {
-            req.set_path(path);
+            req.path = path;
         }
 
         let file_size_str = utils::get_option("file_size", options, args)?;
@@ -2050,7 +2063,7 @@ fn agent_cmd_sandbox_copy_file(
                 .parse::<i64>()
                 .map_err(|e| anyhow!(e).context("invalid file_size"))?;
 
-            req.set_file_size(file_size);
+            req.file_size  = file_size;
         }
 
         let file_mode_str = utils::get_option("file_mode", options, args)?;
@@ -2060,7 +2073,7 @@ fn agent_cmd_sandbox_copy_file(
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid file_mode"))?;
 
-            req.set_file_mode(file_mode);
+            req.file_mode  = file_mode;
         }
 
         let dir_mode_str = utils::get_option("dir_mode", options, args)?;
@@ -2070,7 +2083,7 @@ fn agent_cmd_sandbox_copy_file(
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid dir_mode"))?;
 
-            req.set_dir_mode(dir_mode);
+            req.dir_mode  = dir_mode;
         }
 
         let uid_str = utils::get_option("uid", options, args)?;
@@ -2080,7 +2093,7 @@ fn agent_cmd_sandbox_copy_file(
                 .parse::<i32>()
                 .map_err(|e| anyhow!(e).context("invalid uid"))?;
 
-            req.set_uid(uid);
+            req.uid  = uid;
         }
 
         let gid_str = utils::get_option("gid", options, args)?;
@@ -2089,7 +2102,7 @@ fn agent_cmd_sandbox_copy_file(
             let gid = gid_str
                 .parse::<i32>()
                 .map_err(|e| anyhow!(e).context("invalid gid"))?;
-            req.set_gid(gid);
+            req.gid  = gid;
         }
 
         let offset_str = utils::get_option("offset", options, args)?;
@@ -2098,13 +2111,13 @@ fn agent_cmd_sandbox_copy_file(
             let offset = offset_str
                 .parse::<i64>()
                 .map_err(|e| anyhow!(e).context("invalid offset"))?;
-            req.set_offset(offset);
+            req.offset  = offset;
         }
 
         let data_str = utils::get_option("data", options, args)?;
         if !data_str.is_empty() {
             let data = utils::str_to_bytes(&data_str)?;
-            req.set_data(data.to_vec());
+            req.data  = data.to_vec();
         }
 
         Ok(())
@@ -2112,16 +2125,18 @@ fn agent_cmd_sandbox_copy_file(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
+    let reply = client.copy_file(req).await?.into_inner();
+    /*
     let reply = client
         .copy_file(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+     */
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
     Ok(())
 }
-*/
 
 async fn agent_cmd_sandbox_reseed_random_dev(
     ctx: &Context,
@@ -2161,6 +2176,66 @@ async fn agent_cmd_sandbox_reseed_random_dev(
     Ok(())
 }
 
+async fn agent_cmd_sandbox_online_cpu_mem(
+    ctx: &Context,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
+    _image: ImageClient<tonic::transport::Channel>,
+    options: &mut Options,
+    args: &str,
+) -> Result<()> {
+    let mut req: OnlineCpuMemRequest = utils::make_request(args)?;
+
+    let ctx = clone_context(ctx);
+
+    run_if_auto_values!(ctx, || -> Result<()> {
+        let wait_str = utils::get_option("wait", options, args)?;
+
+        if !wait_str.is_empty() {
+            let wait = wait_str
+                .parse::<bool>()
+                .map_err(|e| anyhow!(e).context("invalid wait bool"))?;
+
+            req.wait = wait;
+        }
+
+        let nb_cpus_str = utils::get_option("nb_cpus", options, args)?;
+
+        if !nb_cpus_str.is_empty() {
+            let nb_cpus = nb_cpus_str
+                .parse::<u32>()
+                .map_err(|e| anyhow!(e).context("invalid nb_cpus value"))?;
+
+            req.nb_cpus = nb_cpus;
+        }
+
+        let cpu_only_str = utils::get_option("cpu_only", options, args)?;
+
+        if !cpu_only_str.is_empty() {
+            let cpu_only = cpu_only_str
+                .parse::<bool>()
+                .map_err(|e| anyhow!(e).context("invalid cpu_only bool"))?;
+
+            req.cpu_only = cpu_only;
+        }
+
+        Ok(())
+    });
+
+    debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
+
+    let reply = client.online_cpu_mem(req).await?.into_inner();
+    /*
+    let reply = client
+        .online_cpu_mem(ctx, &req)
+        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    */
+
+    info!(sl!(), "response received";
+        "response" => format!("{:?}", reply));
+
+    Ok(())
+}
 
 async fn agent_cmd_sandbox_set_guest_date_time(
     ctx: &Context,

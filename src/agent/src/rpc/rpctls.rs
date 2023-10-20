@@ -29,8 +29,8 @@ use tonic::{
     },
 };
 
-use crate::rpc::rpctls::grpctls::{CreateContainerRequest, CloseStdinRequest, ExecProcessRequest, GetMetricsRequest, 
-    GetOomEventRequest, Interfaces, ListInterfacesRequest, ListContainersRequest, ListRoutesRequest, Metrics, 
+use crate::rpc::rpctls::grpctls::{CopyFileRequest, CreateContainerRequest, CloseStdinRequest, ExecProcessRequest, GetMetricsRequest, 
+    GetOomEventRequest, Interfaces, ListInterfacesRequest, ListContainersRequest, ListRoutesRequest, Metrics, OnlineCpuMemRequest, 
     OomEvent, PauseContainerRequest, ReadStreamRequest, ReadStreamResponse, RemoveContainerRequest, ReseedRandomDevRequest, 
     ResumeContainerRequest, Routes, SetGuestDateTimeRequest, SignalProcessRequest, StartContainerRequest, 
     TtyWinResizeRequest, WaitProcessRequest, WaitProcessResponse, WriteStreamRequest, WriteStreamResponse, UpdateContainerRequest, 
@@ -630,6 +630,32 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
         }
     }
 
+    async fn online_cpu_mem(
+        &self,
+        req: tonic::Request<OnlineCpuMemRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+
+        info!(sl!(), "grpctls: online_cpu_mem req: {:?}", req);
+        let internal = req.into_inner();
+
+        let mut ttrpc_req = protocols::agent::OnlineCPUMemRequest::new(); 
+        ttrpc_req.set_wait(internal.wait);
+        ttrpc_req.set_nb_cpus(internal.nb_cpus);
+        ttrpc_req.set_cpu_only(internal.cpu_only);
+
+        let sandbox = self.sandbox.lock().await;
+
+        sandbox
+            .online_cpu_memory(&ttrpc_req)
+            .map_err(|e| 
+                tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("{:?}", e)
+            ))?;
+
+        Ok(tonic::Response::new(()))
+    }
+
     async fn reseed_random_dev(
         &self,
         req: tonic::Request<ReseedRandomDevRequest>,
@@ -660,6 +686,33 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
                     tonic::Code::Internal,
                     format!("{:?}", e)
             )})?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn copy_file(
+        &self,
+        req: tonic::Request<CopyFileRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        info!(sl!(), "grpctls: reseed_random_dev req: {:?}", req);
+
+        let internal = req.into_inner();
+        let mut ttrpc_req = agent::CopyFileRequest::new(); 
+
+        ttrpc_req.set_path(internal.path);
+        ttrpc_req.set_file_size(internal.file_size);
+        ttrpc_req.set_file_mode(internal.file_mode);
+        ttrpc_req.set_dir_mode(internal.dir_mode);
+        ttrpc_req.set_uid(internal.uid);
+        ttrpc_req.set_gid(internal.gid);
+        ttrpc_req.set_offset(internal.offset);
+        ttrpc_req.set_data(internal.data);
+
+        super::do_copy_file(&ttrpc_req).map_err(|e| 
+                tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("{:?}", e)
+            ))?;
 
         Ok(tonic::Response::new(()))
     }
