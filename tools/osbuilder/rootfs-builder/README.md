@@ -55,7 +55,7 @@ To build a rootfs for your chosen distribution, run:
 $ sudo ./rootfs.sh <distro>
 ```
 
-## Creating a rootfs with Enclave Attestation Architecture (*EAA*) protocol and grpc tls channel support
+## Creating a rootfs with the Key Broker Service (KBS) Attestation protocol enabled and grpc tls channel support
 
 1. Create TLS keys and certificates for`kata-agent`and client using the grpc tls channel.
   ```bash
@@ -63,27 +63,19 @@ $ sudo ./rootfs.sh <distro>
  $  ./gen_key_cert.sh
  $ popd
   ```
-
-2. Apply patch to enable build with RATS supporting `tdx_ecdsa` attester on tdx enabled platform.
-  ```bash
-  $ git apply attest.patch
-  ```
-
-3. Set environment variables.
+2. Set environment variables.
   ```bash
   $ export distro=ubuntu
   $ export ROOTFS_DIR=$PWD/rootfs
   ```
 
-4. Build root image.
-    ```bash
-   $  sudo -E GOPATH=$GOPATH USE_PODMAN=true SECCOMP=no UMOCI=yes AA_KBC=eaa_kbc EXTRA_PKGS="wget vim tar gcc g++ make cmake git openssh-client unzip libssl-dev " ./rootfs.sh ${distro}
-    ``` 
-
-5. Copy agent configuration file,`agent.toml`, file to rootfs; but first, update the `aa_kbc_params`configuration in the file with the **IP address** and **port number** of your key broker service provider, e.g., `verdictd`. 
-
+3. Build root image, assuming running on a TDX host
   ```bash
-  $ # In agent.toml update: KBS_IP_ADDRESS and KBS_PORT_NUMBER fields
+   $  sudo -E GOPATH=$GOPATH USE_PODMAN=true SECCOMP=no AA_KBC=cc_kbc_tdx ./rootfs.sh ${distro}
+  ```
+
+4. Copy agent configuration file,`agent.toml`, file to rootfs; but first, update the `aa_kbc_params`configuration option in the file with the **IP address** and **port number** of your key broker service provider, e.g., `cc_kbc::http://[IP_ADDRESS]:[PORT]`, OR add to `kernel_params` using the `agent.aa_kbc_params` option.
+  ```bash
   $ sudo cp agent.toml rootfs/root
   ```
 
