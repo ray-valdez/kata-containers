@@ -12,6 +12,7 @@ use std::str::FromStr;
 use std::time;
 use tracing::instrument;
 use url::Url;
+use std::sync::RwLock;
 
 use kata_types::config::default::DEFAULT_AGENT_VSOCK_PORT;
 
@@ -35,6 +36,7 @@ const ENABLE_SIGNATURE_VERIFICATION: &str = "agent.enable_signature_verification
 const IMAGE_POLICY_FILE: &str = "agent.image_policy";
 const IMAGE_REGISTRY_AUTH_FILE: &str = "agent.image_registry_auth";
 const SIMPLE_SIGNING_SIGSTORE_CONFIG: &str = "agent.simple_signing_sigstore_config";
+const SPLIT_API_FLAG: &str = "agent.split_api";
 
 const DEFAULT_LOG_LEVEL: slog::Level = slog::Level::Info;
 const DEFAULT_HOTPLUG_TIMEOUT: time::Duration = time::Duration::from_secs(3);
@@ -85,7 +87,7 @@ pub struct AgentConfig {
     pub server_addr: String,
     pub unified_cgroup_hierarchy: bool,
     pub tracing: bool,
-    pub endpoints: AgentEndpoints,
+    pub endpoints: RwLock<AgentEndpoints>,
     pub supports_seccomp: bool,
     pub container_policy_path: String,
     pub aa_kbc_params: String,
@@ -97,6 +99,7 @@ pub struct AgentConfig {
     pub image_policy_file: String,
     pub image_registry_auth_file: String,
     pub simple_signing_sigstore_config: String,
+    pub split_api: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,6 +125,7 @@ pub struct AgentConfigBuilder {
     pub image_policy_file: Option<String>,
     pub image_registry_auth_file: Option<String>,
     pub simple_signing_sigstore_config: Option<String>,
+    pub split_api: Option<bool>,
 }
 
 macro_rules! config_override {
@@ -193,6 +197,7 @@ impl Default for AgentConfig {
             image_policy_file: String::from(""),
             image_registry_auth_file: String::from(""),
             simple_signing_sigstore_config: String::from(""),
+            split_api: false,
         }
     }
 }
@@ -234,6 +239,7 @@ impl FromStr for AgentConfig {
         );
         config_override!(agent_config_builder, agent_config, image_policy_file);
         config_override!(agent_config_builder, agent_config, image_registry_auth_file);
+        config_override!(agent_config_builder, agent_config, split_api);
         config_override!(
             agent_config_builder,
             agent_config,
@@ -242,8 +248,9 @@ impl FromStr for AgentConfig {
 
         // Populate the allowed endpoints hash set, if we got any from the config file.
         if let Some(endpoints) = agent_config_builder.endpoints {
+            let mut agent_endpoints = agent_config.endpoints.write().unwrap();
             for ep in endpoints.allowed {
-                agent_config.endpoints.allowed.insert(ep);
+                agent_endpoints.allowed.insert(ep);
             }
         }
 
@@ -390,6 +397,13 @@ impl AgentConfig {
                 config.simple_signing_sigstore_config,
                 get_string_value
             );
+
+            parse_cmdline_param!(
+                param,
+                SPLIT_API_FLAG,
+                config.split_api,
+                get_bool_value
+            );
         }
 
         if let Ok(addr) = env::var(SERVER_ADDR_ENV_VAR) {
@@ -410,7 +424,8 @@ impl AgentConfig {
 
         // We did not get a configuration file: allow all endpoints.
         if !using_config_file {
-            config.endpoints.all_allowed = true;
+            let mut agent_endpoints = config.endpoints.write().unwrap();
+            agent_endpoints.all_allowed = true;
         }
 
         Ok(config)
@@ -424,7 +439,29 @@ impl AgentConfig {
     }
 
     pub fn is_allowed_endpoint(&self, ep: &str) -> bool {
-        self.endpoints.all_allowed || self.endpoints.allowed.contains(ep)
+        let agent_endpoints = self.endpoints.read().unwrap();
+         agent_endpoints.all_allowed || agent_endpoints.allowed.contains(ep)
+    }
+
+    pub fn remove_owner_api(&self) -> Result<()> {
+        let owner_api_list = vec![
+                    "CreateContainerRequest".to_string(),
+                    "CopyFileRequest".to_string(),
+                    "PauseContainerRequest".to_string(),
+                    "PullImageRequest".to_string(),
+                    "RemoveContainerRequest".to_string(),
+                    "ReseedRandomRequest".to_string(),
+                    "ResumeContainerRequest".to_string(),
+                    "SetGuestDateTimeRequest".to_string(),
+                    "StartContainerRequest".to_string(),
+                    "TtyWinResizeRequest".to_string(),
+                    "UpdateContainerRequest".to_string()];
+
+        let mut agent_endpoints = self.endpoints.write().unwrap();
+        for item in owner_api_list {
+            agent_endpoints.allowed.remove(&item);
+        }
+        Ok(())
     }
 }
 

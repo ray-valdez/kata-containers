@@ -28,6 +28,7 @@ const ANNO_K8S_IMAGE_NAME: &str = "io.kubernetes.cri.image-name";
 use image_rs::image::ImageClient;
 use std::io::Write;
 
+use crate::rpc::is_allowed;
 use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
 use crate::rpc::rpctls::grpctls;
 
@@ -377,6 +378,7 @@ impl protocols::image_ttrpc_async::Image for ImageService {
         _ctx: &ttrpc::r#async::TtrpcContext,
         req: image::PullImageRequest,
     ) -> ttrpc::Result<image::PullImageResponse> {
+        is_allowed(&req)?;
         match self.pull_image(&req).await {
             Ok(r) => {
                 let mut resp = image::PullImageResponse::new();
