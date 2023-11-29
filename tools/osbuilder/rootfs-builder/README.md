@@ -55,9 +55,12 @@ To build a rootfs for your chosen distribution, run:
 $ sudo ./rootfs.sh <distro>
 ```
 
-## Creating a rootfs with the Key Broker Service (KBS) Attestation protocol enabled and grpc tls channel support
+## Creating a rootfs with the Key Broker Service (KBS) Attestation protocol enabled and gRPC TLS channel support
 
-1. Create TLS keys and certificates for`kata-agent`and client using the grpc tls channel.
+The gRPC TLS channel facilitates the split api feature, which restricts access to sensitive `kata-agent` endpoint APIs from the host's VSOCK while allowing access exclusively through the gRPC TLS channel.
+
+
+1. Create TLS keys and certificates for `kata-agent` and client using the grpc tls channel.
   ```bash
  $ pushd ../../../src/agent/grpc_tls_keys
  $  ./gen_key_cert.sh
@@ -74,10 +77,12 @@ $ sudo ./rootfs.sh <distro>
    $  sudo -E GOPATH=$GOPATH USE_PODMAN=true SECCOMP=no AA_KBC=cc_kbc_tdx ./rootfs.sh ${distro}
   ```
 
-4. Copy agent configuration file,`agent.toml`, file to rootfs; but first, update the `aa_kbc_params`configuration option in the file with the **IP address** and **port number** of your key broker service provider, e.g., `cc_kbc::http://[IP_ADDRESS]:[PORT]`, OR add to `kernel_params` using the `agent.aa_kbc_params` option.
+4. Copy agent configuration file,`agent.toml`, file to rootfs; but first, update the `aa_kbc_params` configuration option in the file with the **IP address** and **port number** of your key broker service provider, e.g., `cc_kbc::http://[IP_ADDRESS]:[PORT]`, OR add to `kernel_params` using the `agent.aa_kbc_params` option.
   ```bash
   $ sudo cp agent.toml rootfs/root
   ```
+
+5. Enable split api feature either in the agent’s `agent.toml` by adding  `split_api = true`,  or in Kata’s `configuration.toml` by adding `agent.split_api=true` to the `kernel_params` configuration parameter. 
 
 ## Creating a rootfs with kernel modules
 
