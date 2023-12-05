@@ -6,7 +6,7 @@ edition = "2018"
 license = "Apache-2.0"
 
 [build-dependencies]
-tonic-build = "0.7"
+tonic-build = "0.8"
 
 [dependencies]
 oci = { path = "../libs/oci" }
@@ -29,8 +29,8 @@ kata-types = { path = "../libs/kata-types" }
 const_format = "0.2.30"
 url = "2.2.2"
 derivative = "2.2.0"
-prost = "0.10"
-tonic = {version="0.7", features = ["tls"]}
+prost = "0.11"
+tonic = {version="0.8", features = ["tls"]}
 zip = "0.5.4"
 attestation_agent = { git = "https://github.com/confidential-containers/guest-components", default-features = false, features = [ "cc_kbc", "rust-crypto", "tdx-attester", "sgx-attester", "openssl" ] }
 
