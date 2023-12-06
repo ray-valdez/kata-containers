@@ -32,7 +32,8 @@ derivative = "2.2.0"
 prost = "0.11"
 tonic = {version="0.8", features = ["tls"]}
 zip = "0.5.4"
-attestation_agent = { git = "https://github.com/confidential-containers/guest-components", default-features = false, features = [ "cc_kbc", "rust-crypto", "tdx-attester", "sgx-attester", "openssl" ] }
+#attestation_agent = { git = "https://github.com/confidential-containers/guest-components", default-features = false, features = [ "cc_kbc", "rust-crypto", "tdx-attester", "sgx-attester", "openssl" ] }
+attestation_agent = { git = "https://github.com/confidential-containers/guest-components", features = [ 'cc_kbc' ] }
 
 # Async helpers
 async-trait = "0.1.42"

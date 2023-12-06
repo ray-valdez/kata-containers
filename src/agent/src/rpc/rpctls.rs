@@ -863,7 +863,7 @@ pub async fn grpcstart(s: Arc<Mutex<Sandbox>>, server_address: &str, init_mode:b
     let sec_agent = AgentService { sandbox: s.clone(), init_mode,  };
     let sec_svc =  grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);    
 
-    let image_service = ImageService::new(s).await;
+    let image_service = ImageService::new();
     let iservice = grpctls::image_server::ImageServer::new(image_service);
 
     let health_service = HealthService{};

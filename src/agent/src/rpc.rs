@@ -168,7 +168,7 @@ async fn policy_allows(req: &(impl MessageDyn + serde::Serialize)) -> ttrpc::Res
     }
 }
 
-async fn is_allowed(req: &(impl MessageDyn + serde::Serialize)) -> ttrpc::Result<()> {
+pub async fn is_allowed(req: &(impl MessageDyn + serde::Serialize)) -> ttrpc::Result<()> {
     let res = config_allows(req);
 
     #[cfg(feature = "agent-policy")]
