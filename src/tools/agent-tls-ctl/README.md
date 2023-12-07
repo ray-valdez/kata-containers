@@ -23,6 +23,14 @@ The tool also requires a set of client public and private key pair and the
 server's CA public key certificate to establish a TLS connection with the `kata-agent`.  
  - Set TLS environmental key variable, `key_dir`,  e.g., set to $KATA_DIR/src/agent/grpc_tls_keys directory, expecting to find the following files: ca.pem, client.pem, and client.key
 
+ > [!NOTE]  
+ > The `kata-agent` depends on the KBS to provision cryptographic keys to the split API proxy server for establishing a secure channel. For testing the API proxy server,  create a zip file named, `tls-keys.zip`, containing the CA public key and the server’s public and private key pair.
+```bash
+cd $OUT_DIR
+$ zip tls-keys.zip server.pem server.key ca.pem
+````
+> Place the `tls-keys.zip`  file in the KBS resource path `/default/tenant-keys/`.  At sandbox creation time, the kata-agent retrieves this file using the KBS get resource API. Future extensions to the KBS will create automatically the server’s public and private key pair for each sandbox.
+
 ### Compile tool
 
 ```bash
