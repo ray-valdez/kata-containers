@@ -245,7 +245,6 @@ fn real_main() -> Result<(), std::io::Error> {
 }
 
 fn real_main_grpctls() -> Result<(), std::io::Error> {
-
     tonic_build::configure()
         .out_dir("src/grpctls")
         .type_attribute("CheckRequest", "#[derive(serde::Deserialize, serde::Serialize)]")
@@ -356,7 +355,7 @@ fn real_main_grpctls() -> Result<(), std::io::Error> {
             "secprotos/image.proto" ], 
             &["secprotos"],
         )?;
-   Ok(())
+    Ok(())
 }
 
 fn main() {

@@ -3,20 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{path::Path};
-use std::io;
 use std::env;
+use std::io;
+use std::path::Path;
 use std::result::Result::Ok;
 
 use anyhow::*;
 use tokio::fs;
 
-use anyhow::Result;
 use crate::AGENT_CONFIG;
+use anyhow::Result;
 /* Sample */
 use attestation_agent::AttestationAPIs;
 use attestation_agent::AttestationAgent;
-
 
 /// Attestation Agent's GetResource gRPC address.
 /// It's given <https://github.com/confidential-containers/attestation-agent#run>
@@ -62,7 +61,6 @@ impl Retriever {
     }
 
     pub fn extract_zip_file(&mut self) -> Result<()> {
-
         let fname = std::path::Path::new(TLS_KEYS_FILE_PATH);
         let outdir = std::path::Path::new(TLS_KEYS_CONFIG_DIR);
         let file = std::fs::File::open(fname).unwrap();
@@ -94,12 +92,12 @@ impl Retriever {
                 use std::os::unix::fs::PermissionsExt;
 
                 if let Some(mode) = file.unix_mode() {
-                    std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode)).unwrap();
+                    std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))
+                        .unwrap();
                 }
             }
         }
         Ok(())
-
     }
 
     pub async fn get_tls_keys(&mut self) -> Result<()> {
@@ -111,26 +109,33 @@ impl Retriever {
 
         info!(sl!(), "get_tls_key: kbc_name: {}", &self.kbc_name);
         info!(sl!(), "get_tls_key: kbc_uri: {}", &self.kbs_uri);
-        info!(sl!(), "get_tls_key: KBS_RESOURCE_PATH: {}", KBS_RESOURCE_PATH);
+        info!(
+            sl!(),
+            "get_tls_key: KBS_RESOURCE_PATH: {}", KBS_RESOURCE_PATH
+        );
 
-        // FIXME: Hard-coded sample attester for now! 
+        // FIXME: Hard-coded sample attester for now!
         let key = "AA_SAMPLE_ATTESTER_TEST";
         env::set_var(key, "yes");
         if env::var(key).is_ok() {
-            info!(sl!() ,"get_tls_key: AA_SAMPLE_ATTESTER_TEST is set!");
+            info!(sl!(), "get_tls_key: AA_SAMPLE_ATTESTER_TEST is set!");
         }
         // obtain the tls keys from KBS through attestation agent
         let mut attestation_agent = AttestationAgent::new();
 
         let resource_bytes = match attestation_agent
-        .download_confidential_resource(&self.kbc_name.to_string(), KBS_RESOURCE_PATH, 
-                                        &self.kbs_uri.to_string())
-        .await {
+            .download_confidential_resource(
+                &self.kbc_name.to_string(),
+                KBS_RESOURCE_PATH,
+                &self.kbs_uri.to_string(),
+            )
+            .await
+        {
             Ok(data) => data,
             Err(e) => {
-                        println!("get_tls_key: Error: {:?}", e);
-                        return Err(e)
-                      }
+                println!("get_tls_key: Error: {:?}", e);
+                return Err(e);
+            }
         };
 
         println!("get_tls_key: print keys {:?}", &resource_bytes);
@@ -148,7 +153,8 @@ pub async fn retrieve_secrets() -> Result<()> {
         let resource_config = format!("provider:attestation-agent:{}", aa_kbc_params);
         if let Some(wrapped_aa_kbc_params) = &Some(&resource_config) {
             let wrapped_aa_kbc_params = wrapped_aa_kbc_params.to_string();
-            let m_aa_kbc_params = wrapped_aa_kbc_params.trim_start_matches("provider:attestation-agent:");
+            let m_aa_kbc_params =
+                wrapped_aa_kbc_params.trim_start_matches("provider:attestation-agent:");
 
             let mut retriver = Retriever::new(m_aa_kbc_params).await?;
             retriver.get_tls_keys().await?;
@@ -161,13 +167,13 @@ pub fn tls_keys_exist() -> bool {
     // check if the directory of tls keys exists
     if Path::new(TLS_KEYS_CONFIG_DIR).exists() {
         // check if all the necessary tls keys are downloaded and extracted
-        if Path::new(TLS_KEYS_CONFIG_DIR).join("server.key").exists() 
-            && Path::new(TLS_KEYS_CONFIG_DIR).join("server.pem").exists() 
-            && Path::new(TLS_KEYS_CONFIG_DIR).join("ca.pem").exists() {
-            
+        if Path::new(TLS_KEYS_CONFIG_DIR).join("server.key").exists()
+            && Path::new(TLS_KEYS_CONFIG_DIR).join("server.pem").exists()
+            && Path::new(TLS_KEYS_CONFIG_DIR).join("ca.pem").exists()
+        {
             return true;
         }
     }
 
-    return false;
+    false
 }

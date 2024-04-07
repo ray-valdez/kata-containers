@@ -77,8 +77,8 @@ use tokio::{
 
 mod image_rpc;
 mod rpc;
-mod tracer;
 mod secrets;
+mod tracer;
 
 #[cfg(feature = "agent-policy")]
 mod policy;
@@ -408,23 +408,28 @@ async fn start_sandbox(
     let mut server = rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
     server.start().await?;
 
-    if config.split_api { 
+    if config.split_api {
         // downloading and extracting the tls keys for the grpctls server
-        match secrets::retrieve_secrets()
-            .await {
-                Ok(_) => println!("main: SUCCESS in getting tenant-keys"),
-                Err(e) => { println!("main: ERROR in get keys: {:?}", e) }
+        match secrets::retrieve_secrets().await {
+            Ok(_) => println!("main: SUCCESS in getting tenant-keys"),
+            Err(e) => {
+                println!("main: ERROR in get keys: {:?}", e)
             }
+        }
 
         // if the tls keys are downloaded and extracted, then start the grpctls server
         if secrets::tls_keys_exist() {
             // Remove owner execlusive APIs from the host side
-            let _ = match config.remove_owner_api() {
+            match config.remove_owner_api() {
                 Ok(_) => println!("main: Disable Owner API"),
-                Err(e) => { println!("main: Unable to disable Owner API: {:?}", e) }
+                Err(e) => {
+                    println!("main: Unable to disable Owner API: {:?}", e)
+                }
             };
 
-            let gserver = rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
+            let gserver =
+                rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode)
+                    .await?;
             gserver.await?;
         }
     }

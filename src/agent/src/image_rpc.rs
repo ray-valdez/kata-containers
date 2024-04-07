@@ -26,8 +26,8 @@ use crate::AGENT_CONFIG;
 const ANNO_K8S_IMAGE_NAME: &str = "io.kubernetes.cri.image-name";
 
 use crate::rpc::is_allowed;
-use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
 use crate::rpc::rpctls::grpctls;
+use crate::rpc::rpctls::grpctls::{PullImageRequest, PullImageResponse};
 
 // kata rootfs is readonly, use tmpfs before CC storage is implemented.
 const KATA_CC_IMAGE_WORK_DIR: &str = "/run/image/";
@@ -367,7 +367,6 @@ impl grpctls::image_server::Image for ImageService {
         &self,
         req: tonic::Request<PullImageRequest>,
     ) -> Result<tonic::Response<PullImageResponse>, tonic::Status> {
-
         let mut nreq = image::PullImageRequest::default();
         let internal = req.into_inner();
 
@@ -375,17 +374,11 @@ impl grpctls::image_server::Image for ImageService {
         nreq.set_container_id(internal.container_id);
         nreq.set_source_creds(internal.source_creds);
 
-         match self.pull_image(&nreq).await {
-            Ok(r) => {
-                Ok(tonic::Response::new(PullImageResponse{image_ref:r}))
-            }
-            Err(e) => Err(tonic::Status::new(
-                                tonic::Code::Internal,
-                                format!("{}", e))),
+        match self.pull_image(&nreq).await {
+            Ok(r) => Ok(tonic::Response::new(PullImageResponse { image_ref: r })),
+            Err(e) => Err(tonic::Status::new(tonic::Code::Internal, format!("{}", e))),
         }
-
-
-  }
+    }
 }
 
 #[cfg(test)]

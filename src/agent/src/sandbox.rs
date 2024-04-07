@@ -14,13 +14,13 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::{thread, time};
 
+use crate::rpc::rpctls::grpctls::ContainerInfo;
 use anyhow::{anyhow, Context, Result};
 use kata_types::cpu::CpuSet;
 use kata_types::mount::StorageDevice;
 use libc::pid_t;
 use oci::{ContainerState, Hook, Hooks};
 use protocols::agent::OnlineCPUMemRequest;
-use crate::rpc::rpctls::grpctls::{ContainerInfo};
 use regex::Regex;
 use rustjail::cgroups as rustjail_cgroups;
 use rustjail::container::BaseContainer;
@@ -296,22 +296,22 @@ impl Sandbox {
             let mut cinfo = ContainerInfo {
                 container_id: c.id(),
                 created: c.init_process_start_time,
-                 ..Default::default()
-                };
-            cinfo.state= match c.status() {
+                ..Default::default()
+            };
+            cinfo.state = match c.status() {
                 ContainerState::Created => "Created".to_string(),
                 ContainerState::Running => "Running".to_string(),
                 ContainerState::Paused => "Pause".to_string(),
                 ContainerState::Stopped => "Stopped".to_string(),
-                _ => "Unknown".to_string()
+                _ => "Unknown".to_string(),
             };
 
             let config = c.config().unwrap();
             let oci = config.spec.as_ref().unwrap();
-            cinfo.annotations =  serde_json::to_string(&oci.annotations).unwrap();
+            cinfo.annotations = serde_json::to_string(&oci.annotations).unwrap();
             list.push(cinfo);
-       }
-       Ok(list)
+        }
+        Ok(list)
     }
 
     #[instrument]
