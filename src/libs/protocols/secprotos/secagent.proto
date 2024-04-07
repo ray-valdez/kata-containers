@@ -34,7 +34,7 @@ service SecAgentService {
 	rpc WaitProcess(WaitProcessRequest) returns (WaitProcessResponse); 
         rpc UpdateContainer(UpdateContainerRequest) returns (google.protobuf.Empty);
         //rpc UpdateEphemeralMounts(UpdateEphemeralMountsRequest) returns (google.protobuf.Empty);
-        //rpc StatsContainer(StatsContainerRequest) returns (StatsContainerResponse);
+        rpc StatsContainer(StatsContainerRequest) returns (StatsContainerResponse);
 	rpc PauseContainer(PauseContainerRequest) returns (google.protobuf.Empty);
 	rpc ResumeContainer(ResumeContainerRequest) returns (google.protobuf.Empty);
 
@@ -67,7 +67,7 @@ service SecAgentService {
         // rpc DestroySandbox(DestroySandboxRequest) returns (google.protobuf.Empty);
         rpc OnlineCPUMem(OnlineCPUMemRequest) returns (google.protobuf.Empty);
         rpc ReseedRandomDev(ReseedRandomDevRequest) returns (google.protobuf.Empty);
-        // rpc GetGuestDetails(GuestDetailsRequest) returns (GuestDetailsResponse);
+        rpc GetGuestDetails(GuestDetailsRequest) returns (GuestDetailsResponse);
         // rpc MemHotplugByProbe(MemHotplugByProbeRequest) returns (google.protobuf.Empty);
         rpc SetGuestDateTime(SetGuestDateTimeRequest) returns (google.protobuf.Empty);
         rpc CopyFile(CopyFileRequest) returns (google.protobuf.Empty);
@@ -108,6 +108,96 @@ message PauseContainerRequest {
 
 message ResumeContainerRequest {
     string container_id = 1;
+}
+
+message CpuUsage {
+	uint64 total_usage = 1;
+	repeated uint64 percpu_usage = 2;
+	uint64 usage_in_kernelmode = 3;
+	uint64 usage_in_usermode = 4;
+}
+
+message ThrottlingData {
+	uint64 periods = 1;
+	uint64 throttled_periods = 2;
+	uint64 throttled_time = 3;
+}
+
+message CpuStats {
+	CpuUsage cpu_usage = 1;
+	ThrottlingData throttling_data = 2;
+}
+
+message PidsStats {
+	uint64 current = 1;
+	uint64 limit = 2;
+}
+
+message MemoryData {
+	uint64 usage = 1;
+	uint64 max_usage = 2;
+	uint64 failcnt = 3;
+	uint64 limit = 4;
+}
+
+message MemoryStats {
+	uint64 cache = 1;
+	MemoryData usage = 2;
+	MemoryData swap_usage = 3;
+	MemoryData kernel_usage = 4;
+	bool use_hierarchy = 5;
+	map<string, uint64> stats = 6;
+}
+
+
+message BlkioStatsEntry {
+	uint64 major = 1;
+	uint64 minor = 2;
+	string op = 3;
+	uint64 value = 4;
+}
+
+message BlkioStats {
+	repeated BlkioStatsEntry io_service_bytes_recursive = 1; // number of bytes transferred to and from the block device
+	repeated BlkioStatsEntry io_serviced_recursive = 2;
+	repeated BlkioStatsEntry io_queued_recursive = 3;
+	repeated BlkioStatsEntry io_service_time_recursive = 4;
+	repeated BlkioStatsEntry io_wait_time_recursive = 5;
+	repeated BlkioStatsEntry io_merged_recursive = 6;
+	repeated BlkioStatsEntry io_time_recursive = 7;
+	repeated BlkioStatsEntry sectors_recursive = 8;
+}
+
+message HugetlbStats {
+	uint64 usage = 1;
+	uint64 max_usage = 2;
+	uint64 failcnt = 3;
+}
+
+message CgroupStats {
+    CpuStats cpu_stats = 1;
+    MemoryStats memory_stats  = 2;
+    PidsStats pids_stats = 3;
+    BlkioStats blkio_stats = 4;
+    map<string, HugetlbStats> hugetlb_stats = 5; // the map is in the format "size of hugepage: stats of the hugepage"
+
+}
+
+message NetworkStats {
+	string name = 1;
+	uint64 rx_bytes = 2;
+	uint64 rx_packets = 3;
+	uint64 rx_errors  = 4;
+	uint64 rx_dropped = 5;
+	uint64 tx_bytes = 6;
+	uint64 tx_packets = 7;
+	uint64 tx_errors = 8;
+	uint64 tx_dropped = 9;
+}
+
+message StatsContainerResponse {
+	CgroupStats cgroup_stats = 1;
+	repeated NetworkStats network_stats = 2;
 }
 
 message ListContainersRequest {
@@ -153,6 +243,10 @@ message WaitProcessResponse {
 message UpdateContainerRequest {
 	string container_id = 1;
 	LinuxResources resources = 2;
+}
+
+message StatsContainerRequest {
+        string container_id = 1;
 }
 
 message WriteStreamRequest {
@@ -224,6 +318,46 @@ message Metrics {
 message ReseedRandomDevRequest {
 	// Data specifies the random data used to reseed the guest crng.
 	bytes data = 2;
+}
+
+// AgentDetails provides information to the client about the running agent.
+message AgentDetails {
+	// Semantic version of agent (see https://semver.org).
+	string version = 1;
+
+	// Set if the agent is running as PID 1.
+	bool init_daemon = 2;
+
+	// List of available device handlers.
+	repeated string device_handlers = 3;
+
+	// List of available storage handlers.
+	repeated string storage_handlers = 4;
+
+	// Set only if the agent is built with seccomp support and the guest
+	// environment supports seccomp.
+	bool supports_seccomp = 5;
+}
+
+message GuestDetailsRequest {
+	// MemBlockSize asks server to return the system memory block size that can be used
+	// for memory hotplug alignment. Typically the server returns what's in
+	// /sys/devices/system/memory/block_size_bytes.
+	bool mem_block_size = 1;
+
+	// MemoryHotplugProbe asks server to return whether guest kernel supports memory hotplug
+        // via probeinterface. Typically the server will check if the path
+        // /sys/devices/system/memory/probe exists.
+	bool mem_hotplug_probe = 2;
+}
+
+message GuestDetailsResponse {
+	// MemBlockSizeBytes returns the system memory block size in bytes.
+	uint64 mem_block_size_bytes = 1;
+
+	AgentDetails agent_details = 2;
+
+	bool support_mem_hotplug_probe = 3;
 }
 
 message SetGuestDateTimeRequest {

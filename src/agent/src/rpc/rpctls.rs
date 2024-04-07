@@ -11,6 +11,8 @@ use protocols::agent;
 use crate::random;
 use crate::sandbox::Sandbox;
 use crate::image_rpc::ImageService;
+
+use crate::linux_abi::*;
 use crate::metrics::get_metrics as other_get_metrics;
 use crate::version::{AGENT_VERSION, API_VERSION};
 use rustjail::container::{BaseContainer, Container};
@@ -30,9 +32,9 @@ use tonic::{
 };
 
 use crate::rpc::rpctls::grpctls::{CopyFileRequest, CreateContainerRequest, CloseStdinRequest, ExecProcessRequest, GetMetricsRequest, 
-    GetOomEventRequest, Interfaces, ListInterfacesRequest, ListContainersRequest, ListRoutesRequest, Metrics, OnlineCpuMemRequest, 
+    GetOomEventRequest, GuestDetailsRequest, GuestDetailsResponse, Interfaces, ListInterfacesRequest, ListContainersRequest, ListRoutesRequest, Metrics, OnlineCpuMemRequest, 
     OomEvent, PauseContainerRequest, ReadStreamRequest, ReadStreamResponse, RemoveContainerRequest, ReseedRandomDevRequest, 
-    ResumeContainerRequest, Routes, SetGuestDateTimeRequest, SignalProcessRequest, StartContainerRequest, 
+    ResumeContainerRequest, Routes, SetGuestDateTimeRequest, SignalProcessRequest, StartContainerRequest, StatsContainerRequest, StatsContainerResponse, 
     TtyWinResizeRequest, WaitProcessRequest, WaitProcessResponse, WriteStreamRequest, WriteStreamResponse, UpdateContainerRequest, 
     CheckRequest, health_check_response, HealthCheckResponse, VersionCheckResponse, ContainerInfoList};
 
@@ -40,11 +42,11 @@ use super::AgentService;
 use super::HealthService;
 
 pub mod grpctls {
-    tonic::include_proto!("grpctls");
+    include!("../../../libs/protocols/src/grpctls/grpctls.rs");
 }
 
 pub mod types {
-    tonic::include_proto!("types");
+    include!("../../../libs/protocols/src/grpctls/types.rs");
 }
 
 // Convenience macro to obtain the scope logger
@@ -285,6 +287,53 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
 
                 Ok(_) => return Ok(resp),
             }
+    }
+
+    async fn stats_container(
+        &self,
+        req: tonic::Request<StatsContainerRequest>,
+    ) -> Result<tonic::Response<StatsContainerResponse>, tonic::Status> {
+        let internal = req.into_inner();
+        let cid = internal.container_id.clone();
+
+        let mut sandbox = self.sandbox.lock().await;
+        let ctr = sandbox.get_container(&cid).ok_or_else(|| {
+            tonic::Status::new(tonic::Code::Internal, "Invalid container id".to_string())
+        })?;
+
+        let ctr_stats = ctr.stats().map_err(|e| {
+            tonic::Status::new(
+                tonic::Code::Internal,
+                format!("fail to get stats info!{:?}", e),
+            )
+        })?;
+
+        // let ctr_obj:  grpctls::StatsContainerResponse = convert_type_grcptls(&ctr_stats)?;
+
+        let ctr_str = match serde_json::to_string(&ctr_stats) {
+            Ok(j) => j,
+            Err(e) => {
+                return Err(tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("Unable to serialize{}", e),
+                ))
+            }
+        };
+
+        let ctr_obj: grpctls::StatsContainerResponse = match serde_json::from_str(&ctr_str) {
+            Ok(k) => k,
+            Err(e) => {
+                return Err(tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("Unable to deserialize{}", e),
+                ))
+            }
+        };
+
+        Ok(tonic::Response::new(StatsContainerResponse {
+            cgroup_stats: ctr_obj.cgroup_stats,
+            network_stats: ctr_obj.network_stats,
+        }))
     }
 
     async fn start_container(
@@ -654,6 +703,57 @@ impl grpctls::sec_agent_service_server::SecAgentService for AgentService {
             ))?;
 
         Ok(tonic::Response::new(()))
+    }
+
+    async fn get_guest_details(
+        &self,
+        req: tonic::Request<GuestDetailsRequest>,
+    ) -> Result<tonic::Response<GuestDetailsResponse>, tonic::Status> {
+        info!(sl!(), "grpctls: get guest details {:?}", req);
+        let internal = req.into_inner();
+
+        //let mut resp = GuestDetailsResponse::new();
+        // to get memory block size
+        let (u, v) = super::get_memory_info(
+            internal.mem_block_size,
+            internal.mem_hotplug_probe,
+            SYSFS_MEMORY_BLOCK_SIZE_PATH,
+            SYSFS_MEMORY_HOTPLUG_PROBE_PATH,
+        )
+        .map_err(|e| {
+            tonic::Status::new(
+                tonic::Code::Internal,
+                format!("fail to get memory info!{:?}", e),
+            )
+        })?;
+
+        let detail = super::get_agent_details();
+        let detail_str = match serde_json::to_string(&detail) {
+            Ok(j) => j,
+            Err(e) => {
+                return Err(tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("Unable to serialize{}", e),
+                ))
+            }
+        };
+
+        let detail_obj: grpctls::AgentDetails = match serde_json::from_str(&detail_str) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("Unable to deserialize{}", e),
+                ))
+            }
+        };
+        let message = Some(detail_obj);
+
+        Ok(tonic::Response::new(GuestDetailsResponse {
+            mem_block_size_bytes: u,
+            support_mem_hotplug_probe: v,
+            agent_details: message,
+        }))
     }
 
     async fn reseed_random_dev(
