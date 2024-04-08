@@ -13,33 +13,34 @@ use slog::{debug, info};
 use std::io;
 use std::io::Write; // XXX: for flush()
 use std::io::{BufRead, BufReader};
-use std::path::{PathBuf};
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
-use tonic;
 use ttrpc::context::Context;
 
 pub mod grpctls {
-    tonic::include_proto!("grpctls");
+    include!("../../../libs/protocols/src/grpctls/grpctls.rs");
 }
 
 pub mod types {
-    tonic::include_proto!("types");
+    include!("../../../libs/protocols/src/grpctls/types.rs");
 }
 
-use grpctls::image_client::ImageClient;
 use grpctls::health_client::HealthClient;
+use grpctls::image_client::ImageClient;
 use grpctls::sec_agent_service_client::SecAgentServiceClient;
 
 use grpctls::{
-    CopyFileRequest, PullImageRequest, CloseStdinRequest, CreateContainerRequest, ExecProcessRequest, GetMetricsRequest, GetOomEventRequest, ListContainersRequest,
-    ListInterfacesRequest, ListRoutesRequest, OnlineCpuMemRequest, PauseContainerRequest, ReadStreamRequest, RemoveContainerRequest, ReseedRandomDevRequest, ResumeContainerRequest,
-    SetGuestDateTimeRequest, StartContainerRequest, SignalProcessRequest, TtyWinResizeRequest, WaitProcessRequest, WriteStreamRequest, UpdateContainerRequest,
-    CheckRequest
+    CheckRequest, CloseStdinRequest, CopyFileRequest, CreateContainerRequest, ExecProcessRequest,
+    GetMetricsRequest, GetOomEventRequest, GuestDetailsRequest, ListContainersRequest,
+    ListInterfacesRequest, ListRoutesRequest, OnlineCpuMemRequest, PauseContainerRequest,
+    PullImageRequest, ReadStreamRequest, RemoveContainerRequest, ReseedRandomDevRequest,
+    ResumeContainerRequest, SetGuestDateTimeRequest, SignalProcessRequest, StartContainerRequest,
+    StatsContainerRequest, TtyWinResizeRequest, UpdateContainerRequest, WaitProcessRequest,
+    WriteStreamRequest,
 };
-
 
 macro_rules! run_if_auto_values {
     ($ctx:expr, $closure:expr) => {{
@@ -96,12 +97,11 @@ type BuiltinCmdFp = fn(args: &str) -> (Result<()>, bool);
 #[allow(dead_code)]
 enum ServiceType {
     Agent,
-    Health, 
+    Health,
     Image,
 }
 
 // Agent command names *MUST* start with an upper-case letter.
-// RV: removed: DEAD CODE: AgentCmd
 #[allow(dead_code)]
 struct AgentCmd {
     name: &'static str,
@@ -180,18 +180,16 @@ static AGENT_CMDS: &[AgentCmd] = &[
         name: "ExecProcess",
         st: ServiceType::Agent,
     },
-    /*
     AgentCmd {
         name: "GetGuestDetails",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_get_guest_details,
     },
+    /*
     AgentCmd {
         name: "GetIptables",
         st: ServiceType::Agent,
-        fp: agent_cmd_sandbox_get_ip_tables,
     },
-    */
+     */
     AgentCmd {
         name: "GetMetrics",
         st: ServiceType::Agent,
@@ -218,7 +216,7 @@ static AGENT_CMDS: &[AgentCmd] = &[
     AgentCmd {
         name: "ListRoutes",
         st: ServiceType::Agent,
-    }, 
+    },
     AgentCmd {
         name: "OnlineCPUMem",
         st: ServiceType::Agent,
@@ -238,7 +236,7 @@ static AGENT_CMDS: &[AgentCmd] = &[
     AgentCmd {
         name: "ReseedRandomDev",
         st: ServiceType::Agent,
-    }, 
+    },
     AgentCmd {
         name: "RemoveContainer",
         st: ServiceType::Agent,
@@ -264,6 +262,10 @@ static AGENT_CMDS: &[AgentCmd] = &[
     },
     AgentCmd {
         name: "StartContainer",
+        st: ServiceType::Agent,
+    },
+    AgentCmd {
+        name: "StatsContainer",
         st: ServiceType::Agent,
     },
     AgentCmd {
@@ -348,7 +350,6 @@ fn get_agent_cmd_details() -> Vec<String> {
     cmds
 }
 
-// REMOVE: RV DEAD CODE
 #[allow(dead_code)]
 fn get_agent_cmd_func(name: &str) -> Result<&str> {
     // fn get_agent_cmd_func(name: &str) -> Result<AgentCmdFp> {
@@ -476,9 +477,9 @@ async fn client_create_tls_channel<'a>(
     client_key.push("client.key");
     ca_cert.push("ca.pem");
 
-    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
-    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
-    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
+    assert!(((client_key.clone()).into_boxed_path()).exists());
+    assert!(((client_cert.clone()).into_boxed_path()).exists());
+    assert!(((ca_cert.clone()).into_boxed_path()).exists());
 
     // Create identify from key and certificate
     let cert = tokio::fs::read(client_cert).await?;
@@ -495,7 +496,7 @@ async fn client_create_tls_channel<'a>(
         .identity(id.clone())
         .ca_certificate(ca.clone());
 
-    let channel = tonic::transport::Channel::from_shared(url_string.clone().to_string()).unwrap();
+    let channel = tonic::transport::Channel::from_shared(url_string.to_string()).unwrap();
     let channel = channel.tls_config(tls)?.connect().await?;
     let client: SecAgentServiceClient<tonic::transport::Channel> =
         SecAgentServiceClient::new(channel);
@@ -532,10 +533,10 @@ async fn create_grpctls_client(
                 }
             };
 
-            let channel = client_create_tls_channel(key_dir, &ip_address, &port.to_string()).await?;
+            let channel = client_create_tls_channel(key_dir, ip_address, &port.to_string()).await?;
             Ok(channel)
         }
-        _ => return Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
+        _ => Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
     }
 }
 
@@ -559,9 +560,9 @@ async fn image_create_tls_channel<'a>(
     client_key.push("client.key");
     ca_cert.push("ca.pem");
 
-    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
-    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
-    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
+    assert!(((client_key.clone()).into_boxed_path()).exists());
+    assert!(((client_cert.clone()).into_boxed_path()).exists());
+    assert!(((ca_cert.clone()).into_boxed_path()).exists());
 
     // Create identify from key and certificate
     let cert = tokio::fs::read(client_cert).await?;
@@ -578,7 +579,7 @@ async fn image_create_tls_channel<'a>(
         .identity(id.clone())
         .ca_certificate(ca.clone());
 
-    let channel = tonic::transport::Channel::from_shared(url_string.clone().to_string()).unwrap();
+    let channel = tonic::transport::Channel::from_shared(url_string.to_string()).unwrap();
     let channel = channel.tls_config(tls)?.connect().await?;
     let client: ImageClient<tonic::transport::Channel> = ImageClient::new(channel);
 
@@ -614,10 +615,10 @@ async fn create_grpctls_image(
                 }
             };
 
-            let channel = image_create_tls_channel(key_dir, &ip_address, &port.to_string()).await?;
+            let channel = image_create_tls_channel(key_dir, ip_address, &port.to_string()).await?;
             Ok(channel)
         }
-        _ => return Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
+        _ => Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
     }
 }
 
@@ -638,9 +639,9 @@ async fn health_create_tls_channel<'a>(
     client_key.push("client.key");
     ca_cert.push("ca.pem");
 
-    assert_eq!(((client_key.clone()).into_boxed_path()).exists(), true);
-    assert_eq!(((client_cert.clone()).into_boxed_path()).exists(), true);
-    assert_eq!(((ca_cert.clone()).into_boxed_path()).exists(), true);
+    assert!(((client_key.clone()).into_boxed_path()).exists());
+    assert!(((client_cert.clone()).into_boxed_path()).exists());
+    assert!(((ca_cert.clone()).into_boxed_path()).exists());
 
     // Create identify from key and certificate
     let cert = tokio::fs::read(client_cert).await?;
@@ -657,7 +658,7 @@ async fn health_create_tls_channel<'a>(
         .identity(id.clone())
         .ca_certificate(ca.clone());
 
-    let channel = tonic::transport::Channel::from_shared(url_string.clone().to_string()).unwrap();
+    let channel = tonic::transport::Channel::from_shared(url_string.clone()).unwrap();
     let channel = channel.tls_config(tls)?.connect().await?;
     let client: HealthClient<tonic::transport::Channel> = HealthClient::new(channel);
 
@@ -693,10 +694,10 @@ async fn create_grpctls_health(
                 }
             };
 
-            let channel = health_create_tls_channel(key_dir, &ip_address, &port.to_string()).await?;
+            let channel = health_create_tls_channel(key_dir, ip_address, &port.to_string()).await?;
             Ok(channel)
         }
-        _ => return Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
+        _ => Err(anyhow!("invalid server address URI scheme: {:?}", scheme)),
     }
 }
 
@@ -732,18 +733,6 @@ async fn kata_service_health(
         create_grpctls_health(key_dir, server_address, hybrid_vsock_port, hybrid_vsock).await?;
     Ok((grpc_channel, 3))
 }
-
-/*
-fn kata_service_health(
-    server_address: String,
-    hybrid_vsock_port: u64,
-    hybrid_vsock: bool,
-) -> Result<HealthClient> {
-    let ttrpc_client = create_ttrpc_client(server_address, hybrid_vsock_port, hybrid_vsock)?;
-
-    Ok(HealthClient::new(ttrpc_client))
-}
-*/
 
 fn announce(cfg: &Config) {
     info!(sl!(), "announce"; "config" => format!("{:?}", cfg));
@@ -808,13 +797,6 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
         Ok((v, v2)) => (v, v2),
         Err(e) => return Err(anyhow!(e).context("Error setting tls channel")),
     };
-    /*
-    let health = kata_service_health(
-        cfg.server_address.clone(),
-        cfg.hybrid_vsock_port,
-        cfg.hybrid_vsock,
-    )?;
-    */
 
     let mut options = Options::new();
 
@@ -855,18 +837,6 @@ pub async fn client(cfg: &Config, commands: Vec<&str>) -> Result<(), anyhow::Err
             continue;
         }
 
-        /*
-        let (result, shutdown) = handle_cmd(
-            cfg,
-            &client,
-            &health,
-            &image,
-            &ttrpc_ctx,
-            repeat_count,
-            &mut options,
-            cmd,
-        );
-        */
         let result = handle_cmd(
             cfg,
             client.clone(),
@@ -1030,7 +1000,6 @@ fn handle_builtin_cmd(_cmd: &str, _args: &str) -> Result<bool> {
 
 // Execute the ttRPC specified by the first field of "line". Return a result
 // along with a bool which if set means the client should shutdown.
-// REMOVE: RV: DEAD CODE: handle_agent_cmd
 
 #[allow(dead_code)]
 async fn handle_agent_cmd(
@@ -1049,116 +1018,115 @@ async fn handle_agent_cmd(
         Err(e) => return Err(e),
     };
     match fname {
-
-        "CloseStdin" => { 
-            let _result =
-                agent_cmd_container_close_stdin(ctx, client, health, image, options, args).await?;
+        "CloseStdin" => {
+            agent_cmd_container_close_stdin(ctx, client, health, image, options, args).await?;
         }
 
         "CreateContainer" => {
-            let _result =
-                agent_cmd_container_create(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_create(ctx, client, health, image, options, args).await?;
         }
 
         "ListContainers" => {
-            let _result =
-                agent_cmd_container_list(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_list(ctx, client, health, image, options, args).await?;
         }
 
         "StartContainer" => {
-            let _result =
-                agent_cmd_container_start(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_start(ctx, client, health, image, options, args).await?;
         }
 
         "RemoveContainer" => {
-            let _result =
-                agent_cmd_container_remove(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_remove(ctx, client, health, image, options, args).await?;
         }
 
         "PauseContainer" => {
-            let _result =
-                agent_cmd_container_pause(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_pause(ctx, client, health, image, options, args).await?;
         }
 
         "ResumeContainer" => {
-            let _result =
-                agent_cmd_container_resume(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_resume(ctx, client, health, image, options, args).await?;
         }
 
         "ExecProcess" => {
-            let _result =
-                agent_cmd_container_exec(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_exec(ctx, client, health, image, options, args).await?;
+        }
+
+        "StatsContainer" => {
+            agent_cmd_container_stats(ctx, client, health, image, options, args).await?;
         }
 
         "SignalProcess" => {
-            let _result = agent_cmd_container_signal_process(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_signal_process(ctx, client, health, image, options, args).await?;
         }
 
         "WaitProcess" => {
-            let _result = agent_cmd_container_wait_process(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_wait_process(ctx, client, health, image, options, args).await?;
         }
 
         "ListInterfaces" => {
-            let _result = agent_cmd_sandbox_list_interfaces(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_list_interfaces(ctx, client, health, image, options, args).await?;
         }
 
         "ListRoutes" => {
-            let _result = 
-                agent_cmd_sandbox_list_routes(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_list_routes(ctx, client, health, image, options, args).await?;
         }
 
         "GetMetrics" => {
-            let _result = agent_cmd_sandbox_get_metrics(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_get_metrics(ctx, client, health, image, options, args).await?;
+        }
+
+        "GetGuestDetails" => {
+            agent_cmd_sandbox_get_guest_details(ctx, client, health, image, options, args).await?;
         }
 
         "ReadStderr" => {
-            let _result = agent_cmd_container_read_stderr(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_read_stderr(ctx, client, health, image, options, args).await?;
         }
 
         "ReadStdout" => {
-            let _result = agent_cmd_container_read_stdout(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_read_stdout(ctx, client, health, image, options, args).await?;
         }
 
         "ReseedRandomDev" => {
-            let _result = agent_cmd_sandbox_reseed_random_dev(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_reseed_random_dev(ctx, client, health, image, options, args).await?;
         }
 
         "SetGuestDateTime" => {
-            let _result = agent_cmd_sandbox_set_guest_date_time(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_set_guest_date_time(ctx, client, health, image, options, args)
+                .await?;
         }
 
         "OnlineCPUMem" => {
-            let _result = agent_cmd_sandbox_online_cpu_mem(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_online_cpu_mem(ctx, client, health, image, options, args).await?;
         }
 
         "TtyWinResize" => {
-            let _result = agent_cmd_container_tty_win_resize(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_tty_win_resize(ctx, client, health, image, options, args).await?;
         }
 
         "GetOOMEvent" => {
-            let _result = agent_cmd_sandbox_get_oom_event(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_get_oom_event(ctx, client, health, image, options, args).await?;
         }
 
         "CopyFile" => {
-            let _result = agent_cmd_sandbox_copy_file(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_copy_file(ctx, client, health, image, options, args).await?;
         }
 
         "UpdateContainer" => {
-            let _result = agent_cmd_sandbox_update_container(ctx, client, health, image, options, args).await?;
+            agent_cmd_sandbox_update_container(ctx, client, health, image, options, args).await?;
         }
 
         "PullImage" => {
-            let _result = agent_cmd_pull_image(ctx, client, health, image, options, args).await?;
+            agent_cmd_pull_image(ctx, client, health, image, options, args).await?;
         }
         "Check" => {
-            let _result = agent_cmd_health_check(ctx, client, health, image, options, args).await?;
+            agent_cmd_health_check(ctx, client, health, image, options, args).await?;
         }
         "Version" => {
-            let _result = agent_cmd_health_version(ctx, client, health, image, options, args).await?;
+            agent_cmd_health_version(ctx, client, health, image, options, args).await?;
         }
 
         "WriteStdin" => {
-            let _result = agent_cmd_container_write_stdin(ctx, client, health, image, options, args).await?;
+            agent_cmd_container_write_stdin(ctx, client, health, image, options, args).await?;
         }
 
         _ => println!("No command "),
@@ -1253,17 +1221,12 @@ async fn agent_cmd_health_check(
     _options: &mut Options,
     args: &str,
 ) -> Result<()> {
-    let req: grpctls::CheckRequest = utils::make_request(args)?;
+    let req: CheckRequest = utils::make_request(args)?;
 
     let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-    let reply = health.check(req).await?.into_inner();
-    /*
-    let reply = health
-        .check(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-    */
+    let reply = health.check(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1275,7 +1238,6 @@ async fn agent_cmd_health_version(
     ctx: &Context,
     _client: SecAgentServiceClient<tonic::transport::Channel>,
     mut health: HealthClient<tonic::transport::Channel>,
-    //health: &HealthClient,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
@@ -1286,7 +1248,7 @@ async fn agent_cmd_health_version(
     let _ctx = clone_context(ctx);
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-    let reply = health.version(req).await?.into_inner();
+    let reply = health.version(req).await?;
     /*
     let reply = health
         .version(ctx, &req)
@@ -1333,20 +1295,14 @@ async fn agent_cmd_container_create(
         Ok(())
     });
     let nsend = match utils::get_option("nsend", options, args) {
-        Ok(v) => {
-            if v.len() == 0 {
-                false
-            } else {
-                true
-            }
-        }
+        Ok(v) => !v.is_empty(),
         Err(_) => false,
     };
     debug!(sl!(), "Boolean"; "send request" => format!("{:?}", nsend));
     debug!(sl!(), "Request"; "tls rpc request" => format!("{:?}", req));
 
     if !nsend {
-        let reply = client.create_container(req).await?.into_inner();
+        let reply = client.create_container(req).await?;
 
         info!(sl!(), "response received";
             "response" => format!("{:?}", reply));
@@ -1381,9 +1337,12 @@ async fn agent_cmd_container_list(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.list_containers(req).await?.into_inner();
+    let reply = client.list_containers(req).await?;
 
-    println!("{}", serde_json::to_string_pretty(&reply).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&reply.into_inner()).unwrap()
+    );
 
     Ok(())
 }
@@ -1412,7 +1371,7 @@ async fn agent_cmd_container_remove(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.remove_container(req).await?.into_inner();
+    let reply = client.remove_container(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1430,42 +1389,9 @@ async fn agent_cmd_container_exec(
 ) -> Result<()> {
     let req: ExecProcessRequest = utils::make_request(args)?;
 
-    //let mut req: SecExecProcessRequest = utils::make_request(args)?;
-    //println!("XXX after args {:?}", req);
-    /*
-     let ctx = clone_context(ctx);
-
-     run_if_auto_values!(ctx, || -> Result<()> {
-         let cid = utils::get_option("cid", options, args)?;
-         let exec_id = utils::get_option("exec_id", options, args)?;
-
-         let ttrpc_spec = utils::get_ttrpc_spec(options, &cid).map_err(|e| anyhow!(e))?;
-
-         let bundle_dir = options
-             .get("bundle-dir")
-             .ok_or("BUG: bundle-dir missing")
-             .map_err(|e| anyhow!(e))?;
-
-         let process = ttrpc_spec
-             .Process
-             .into_option()
-             .ok_or(format!(
-                 "failed to get process from OCI spec: {}",
-                 bundle_dir,
-             ))
-             .map_err(|e| anyhow!(e))?;
-
-     println!("RV:: Processs {:?}", process);
-         req.container_id = cid;
-         req.exec_id = exec_id;
-         //req.process = process;
-         Ok(())
-     });
-    */
-
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.exec_process(req).await?.into_inner();
+    let reply = client.exec_process(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1473,12 +1399,11 @@ async fn agent_cmd_container_exec(
     Ok(())
 }
 
-/*
-fn agent_cmd_container_stats(
+async fn agent_cmd_container_stats(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
-    _image: &ImageClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
+    _image: ImageClient<tonic::transport::Channel>,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
@@ -1489,22 +1414,19 @@ fn agent_cmd_container_stats(
     run_if_auto_values!(ctx, || -> Result<()> {
         let cid = utils::get_option("cid", options, args)?;
 
-        req.set_container_id(cid);
+        req.container_id = cid;
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client
-        .stats_container(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    let reply = client.stats_container(req).await?;
 
     info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
+        "response" => format!("{:?}", reply.into_inner()));
 
     Ok(())
 }
-*/
 
 async fn agent_cmd_container_pause(
     ctx: &Context,
@@ -1527,7 +1449,7 @@ async fn agent_cmd_container_pause(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.pause_container(req).await?.into_inner();
+    let reply = client.pause_container(req).await?;
 
     info!(sl!(), "response received";
             "response" => format!("{:?}", reply));
@@ -1555,7 +1477,7 @@ async fn agent_cmd_container_resume(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.resume_container(req).await?.into_inner();
+    let reply = client.resume_container(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1568,7 +1490,6 @@ async fn agent_cmd_container_start(
     mut client: SecAgentServiceClient<tonic::transport::Channel>,
     _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
-    //health: &HealthClient,
     options: &mut Options,
     args: &str,
 ) -> Result<()> {
@@ -1586,7 +1507,7 @@ async fn agent_cmd_container_start(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.start_container(req).await?.into_inner();
+    let reply = client.start_container(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1594,11 +1515,11 @@ async fn agent_cmd_container_start(
     Ok(())
 }
 
-/*
-fn agent_cmd_sandbox_get_guest_details(
+#[allow(clippy::redundant_closure_call)]
+async fn agent_cmd_sandbox_get_guest_details(
     ctx: &Context,
-    client: &AgentServiceClient,
-    _health: &HealthClient,
+    mut client: SecAgentServiceClient<tonic::transport::Channel>,
+    _health: HealthClient<tonic::transport::Channel>,
     _image: ImageClient<tonic::transport::Channel>,
     _options: &mut Options,
     args: &str,
@@ -1608,24 +1529,21 @@ fn agent_cmd_sandbox_get_guest_details(
     let ctx = clone_context(ctx);
 
     run_if_auto_values!(ctx, || -> Result<()> {
-        req.set_mem_block_size(true);
-        req.set_mem_hotplug_probe(true);
+        req.mem_block_size = true;
+        req.mem_hotplug_probe = true;
 
         Ok(())
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client
-        .get_guest_details(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
+    let reply = client.get_guest_details(req).await?;
 
     info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
+        "response" => format!("{:?}", reply.into_inner()));
 
     Ok(())
 }
-*/
 
 async fn agent_cmd_container_wait_process(
     ctx: &Context,
@@ -1650,7 +1568,7 @@ async fn agent_cmd_container_wait_process(
     });
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
-    let reply = client.wait_process(req).await?.into_inner();
+    let reply = client.wait_process(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1691,18 +1609,10 @@ async fn agent_cmd_container_signal_process(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.signal_process(req).await?.into_inner();
+    let reply = client.signal_process(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
-    /*
-    let reply = client
-        .signal_process(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    info!(sl!(), "response received";
-        "response" => format!("{:?}", reply));
-        */
 
     Ok(())
 }
@@ -1721,7 +1631,7 @@ async fn agent_cmd_sandbox_list_interfaces(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.list_interfaces(req).await?.into_inner();
+    let reply = client.list_interfaces(req).await?;
 
     /*
     let reply = client
@@ -1748,12 +1658,7 @@ async fn agent_cmd_sandbox_list_routes(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.list_routes(req).await?.into_inner();
-    /*
-    let reply = client
-        .list_routes(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-    */
+    let reply = client.list_routes(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -1804,7 +1709,7 @@ async fn agent_cmd_container_tty_win_resize(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.tty_win_resize(req).await?.into_inner();
+    let reply = client.tty_win_resize(req).await?;
     /*
     let reply = client
         .tty_win_resize(ctx, &req)
@@ -1840,14 +1745,8 @@ async fn agent_cmd_container_close_stdin(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.close_stdin(req).await?.into_inner();
+    let reply = client.close_stdin(req).await?;
 
-    /*
-    let reply = client
-        .close_stdin(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-
-    */
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
@@ -1887,12 +1786,8 @@ async fn agent_cmd_container_read_stdout(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.read_stdout(req).await?.into_inner();
-    /*
-    let reply = client
-        .read_stdout(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-    */
+    let reply = client.read_stdout(req).await?;
+
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
@@ -1924,7 +1819,7 @@ async fn agent_cmd_container_read_stderr(
             let length = length_str
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid length"))?;
-            req.len =  length;
+            req.len = length;
         }
 
         Ok(())
@@ -1932,12 +1827,8 @@ async fn agent_cmd_container_read_stderr(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.read_stderr(req).await?.into_inner();
-    /*
-    let reply = client
-        .read_stderr(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-    */ 
+    let reply = client.read_stderr(req).await?;
+
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
@@ -1972,7 +1863,7 @@ async fn agent_cmd_container_write_stdin(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.write_stdin(req).await?.into_inner();
+    let reply = client.write_stdin(req).await?;
     /*
     let reply = client
         .write_stdin(ctx, &req)
@@ -1999,12 +1890,8 @@ async fn agent_cmd_sandbox_get_metrics(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.get_metrics(req).await?.into_inner();
-    /*
-    let reply = client
-        .get_metrics(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-    */
+    let reply = client.get_metrics(req).await?;
+
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
 
@@ -2025,7 +1912,7 @@ async fn agent_cmd_sandbox_get_oom_event(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.get_oom_event(req).await?.into_inner();
+    let reply = client.get_oom_event(req).await?;
 
     /*
     let reply = client
@@ -2063,7 +1950,7 @@ async fn agent_cmd_sandbox_copy_file(
                 .parse::<i64>()
                 .map_err(|e| anyhow!(e).context("invalid file_size"))?;
 
-            req.file_size  = file_size;
+            req.file_size = file_size;
         }
 
         let file_mode_str = utils::get_option("file_mode", options, args)?;
@@ -2073,7 +1960,7 @@ async fn agent_cmd_sandbox_copy_file(
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid file_mode"))?;
 
-            req.file_mode  = file_mode;
+            req.file_mode = file_mode;
         }
 
         let dir_mode_str = utils::get_option("dir_mode", options, args)?;
@@ -2083,7 +1970,7 @@ async fn agent_cmd_sandbox_copy_file(
                 .parse::<u32>()
                 .map_err(|e| anyhow!(e).context("invalid dir_mode"))?;
 
-            req.dir_mode  = dir_mode;
+            req.dir_mode = dir_mode;
         }
 
         let uid_str = utils::get_option("uid", options, args)?;
@@ -2093,7 +1980,7 @@ async fn agent_cmd_sandbox_copy_file(
                 .parse::<i32>()
                 .map_err(|e| anyhow!(e).context("invalid uid"))?;
 
-            req.uid  = uid;
+            req.uid = uid;
         }
 
         let gid_str = utils::get_option("gid", options, args)?;
@@ -2102,7 +1989,7 @@ async fn agent_cmd_sandbox_copy_file(
             let gid = gid_str
                 .parse::<i32>()
                 .map_err(|e| anyhow!(e).context("invalid gid"))?;
-            req.gid  = gid;
+            req.gid = gid;
         }
 
         let offset_str = utils::get_option("offset", options, args)?;
@@ -2111,13 +1998,13 @@ async fn agent_cmd_sandbox_copy_file(
             let offset = offset_str
                 .parse::<i64>()
                 .map_err(|e| anyhow!(e).context("invalid offset"))?;
-            req.offset  = offset;
+            req.offset = offset;
         }
 
         let data_str = utils::get_option("data", options, args)?;
         if !data_str.is_empty() {
             let data = utils::str_to_bytes(&data_str)?;
-            req.data  = data.to_vec();
+            req.data = data.to_vec();
         }
 
         Ok(())
@@ -2125,12 +2012,7 @@ async fn agent_cmd_sandbox_copy_file(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.copy_file(req).await?.into_inner();
-    /*
-    let reply = client
-        .copy_file(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-     */
+    let reply = client.copy_file(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -2162,7 +2044,7 @@ async fn agent_cmd_sandbox_reseed_random_dev(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.reseed_random_dev(req).await?.into_inner();
+    let reply = client.reseed_random_dev(req).await?;
 
     /*
     let reply = client
@@ -2224,12 +2106,7 @@ async fn agent_cmd_sandbox_online_cpu_mem(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.online_cpu_mem(req).await?.into_inner();
-    /*
-    let reply = client
-        .online_cpu_mem(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-    */
+    let reply = client.online_cpu_mem(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -2275,13 +2152,13 @@ async fn agent_cmd_sandbox_set_guest_date_time(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    /* 
+    /*
     let reply = client
         .set_guest_date_time(ctx, &req)
         .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
     */
 
-    let reply = client.set_guest_date_time(req).await?.into_inner();
+    let reply = client.set_guest_date_time(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -2314,12 +2191,7 @@ async fn agent_cmd_sandbox_update_container(
 
     debug!(sl!(), "sending request"; "request" => format!("{:?}", req));
 
-    let reply = client.update_container(req).await?.into_inner();
-    /*
-    let reply = client
-        .update_container(ctx, &req)
-        .map_err(|e| anyhow!("{:?}", e).context(ERR_API_FAILED))?;
-     */
+    let reply = client.update_container(req).await?;
 
     info!(sl!(), "response received";
         "response" => format!("{:?}", reply));
@@ -2341,27 +2213,20 @@ async fn agent_cmd_pull_image(
     let container_id = utils::get_option("cid", options, args)?;
     let source_creds = utils::get_option("source_creds", options, args)?;
 
-    let req: grpctls::PullImageRequest = PullImageRequest {
+    let req: PullImageRequest = PullImageRequest {
         image,
         container_id,
         source_creds,
     };
-    // debug!(sl!(), "PullImage"; "request" => format!("{:?}", req));
 
     let nsend = match utils::get_option("nsend", options, args) {
-        Ok(v) => {
-            if v.len() == 0 {
-               false 
-            } else {
-                true 
-            }
-        }
+        Ok(v) => !v.is_empty(),
         Err(_) => false,
     };
     debug!(sl!(), "PullImage"; "request" => format!("{:?}", nsend));
 
     if !nsend {
-        let reply = image_client.pull_image(req).await?.into_inner();
+        let reply = image_client.pull_image(req).await?;
 
         info!(sl!(), "response received";
             "response" => format!("{:?}", reply));
