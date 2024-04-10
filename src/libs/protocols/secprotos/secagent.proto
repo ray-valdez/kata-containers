@@ -18,63 +18,63 @@ import "google/protobuf/empty.proto";
 
 // unstable
 service SecAgentService {
-	// execution
-	rpc CreateContainer(CreateContainerRequest) returns (google.protobuf.Empty);
-	rpc StartContainer(StartContainerRequest) returns (google.protobuf.Empty);
+    // execution
+    rpc CreateContainer(CreateContainerRequest) returns (google.protobuf.Empty);
+    rpc StartContainer(StartContainerRequest) returns (google.protobuf.Empty);
 
-        // RemoveContainer will tear down an existing container by forcibly terminating
-	// all processes running inside that container and releasing all internal
-	// resources associated with it.
-	// RemoveContainer will wait for all processes termination before returning.
-	// If any process can not be killed or if it can not be killed after
-	// the RemoveContainerRequest timeout, RemoveContainer will return an error.
-	rpc RemoveContainer(RemoveContainerRequest) returns (google.protobuf.Empty);
-	rpc ExecProcess(ExecProcessRequest) returns (google.protobuf.Empty);
-        rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
-	rpc WaitProcess(WaitProcessRequest) returns (WaitProcessResponse); 
-        rpc UpdateContainer(UpdateContainerRequest) returns (google.protobuf.Empty);
-        //rpc UpdateEphemeralMounts(UpdateEphemeralMountsRequest) returns (google.protobuf.Empty);
-        rpc StatsContainer(StatsContainerRequest) returns (StatsContainerResponse);
-	rpc PauseContainer(PauseContainerRequest) returns (google.protobuf.Empty);
-	rpc ResumeContainer(ResumeContainerRequest) returns (google.protobuf.Empty);
+    // RemoveContainer will tear down an existing container by forcibly terminating
+    // all processes running inside that container and releasing all internal
+    // resources associated with it.
+    // RemoveContainer will wait for all processes termination before returning.
+    // If any process can not be killed or if it can not be killed after
+    // the RemoveContainerRequest timeout, RemoveContainer will return an error.
+    rpc RemoveContainer(RemoveContainerRequest) returns (google.protobuf.Empty);
+    rpc ExecProcess(ExecProcessRequest) returns (google.protobuf.Empty);
+    rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
+    rpc WaitProcess(WaitProcessRequest) returns (WaitProcessResponse); 
+    rpc UpdateContainer(UpdateContainerRequest) returns (google.protobuf.Empty);
+    //rpc UpdateEphemeralMounts(UpdateEphemeralMountsRequest) returns (google.protobuf.Empty);
+    rpc StatsContainer(StatsContainerRequest) returns (StatsContainerResponse);
+    rpc PauseContainer(PauseContainerRequest) returns (google.protobuf.Empty);
+    rpc ResumeContainer(ResumeContainerRequest) returns (google.protobuf.Empty);
 
-	// new api 
-	rpc ListContainers(ListContainersRequest) returns(ContainerInfoList);
+    // new api 
+    rpc ListContainers(ListContainersRequest) returns(ContainerInfoList);
 
-        // stdio
-	rpc WriteStdin(WriteStreamRequest) returns (WriteStreamResponse);
-	rpc ReadStdout(ReadStreamRequest) returns (ReadStreamResponse);
-	rpc ReadStderr(ReadStreamRequest) returns (ReadStreamResponse);
-	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
-	rpc TtyWinResize(TtyWinResizeRequest) returns (google.protobuf.Empty);
+    // stdio
+    rpc WriteStdin(WriteStreamRequest) returns (WriteStreamResponse);
+    rpc ReadStdout(ReadStreamRequest) returns (ReadStreamResponse);
+    rpc ReadStderr(ReadStreamRequest) returns (ReadStreamResponse);
+    rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
+    rpc TtyWinResize(TtyWinResizeRequest) returns (google.protobuf.Empty);
 
-	// networking
-        //rpc UpdateInterface(UpdateInterfaceRequest) returns (types.Interface);
-	//rpc UpdateRoutes(UpdateRoutesRequest) returns (Routes);
-	rpc ListInterfaces(ListInterfacesRequest) returns(Interfaces);
-	rpc ListRoutes(ListRoutesRequest) returns (Routes);
-	//rpc AddARPNeighbors(AddARPNeighborsRequest) returns (google.protobuf.Empty);
-	//rpc GetIPTables(GetIPTablesRequest) returns (GetIPTablesResponse);
-	//rpc SetIPTables(SetIPTablesRequest) returns (SetIPTablesResponse);
+    // networking
+    //rpc UpdateInterface(UpdateInterfaceRequest) returns (types.Interface);
+    //rpc UpdateRoutes(UpdateRoutesRequest) returns (Routes);
+    rpc ListInterfaces(ListInterfacesRequest) returns(Interfaces);
+    rpc ListRoutes(ListRoutesRequest) returns (Routes);
+    //rpc AddARPNeighbors(AddARPNeighborsRequest) returns (google.protobuf.Empty);
+    //rpc GetIPTables(GetIPTablesRequest) returns (GetIPTablesResponse);
+    //rpc SetIPTables(SetIPTablesRequest) returns (SetIPTablesResponse);
 
-        // observability
-        rpc GetMetrics(GetMetricsRequest) returns (Metrics);
+     // observability
+     rpc GetMetrics(GetMetricsRequest) returns (Metrics);
 
-        // Some host-side sandbox related APIs not supported over tenant-side
+     // Some host-side sandbox related APIs not supported over tenant-side
 
-        // misc (TODO: some rpcs can be replaced by hyperstart-exec)
-        // rpc CreateSandbox(CreateSandboxRequest) returns (google.protobuf.Empty);
-        // rpc DestroySandbox(DestroySandboxRequest) returns (google.protobuf.Empty);
-        rpc OnlineCPUMem(OnlineCPUMemRequest) returns (google.protobuf.Empty);
-        rpc ReseedRandomDev(ReseedRandomDevRequest) returns (google.protobuf.Empty);
-        rpc GetGuestDetails(GuestDetailsRequest) returns (GuestDetailsResponse);
-        // rpc MemHotplugByProbe(MemHotplugByProbeRequest) returns (google.protobuf.Empty);
-        rpc SetGuestDateTime(SetGuestDateTimeRequest) returns (google.protobuf.Empty);
-        rpc CopyFile(CopyFileRequest) returns (google.protobuf.Empty);
-        rpc GetOOMEvent(GetOOMEventRequest) returns (OOMEvent);
-        // rpc AddSwap(AddSwapRequest) returns (google.protobuf.Empty);
-        // rpc GetVolumeStats(VolumeStatsRequest) returns (VolumeStatsResponse);
-        // rpc ResizeVolume(ResizeVolumeRequest) returns (google.protobuf.Empty);
+     // misc (TODO: some rpcs can be replaced by hyperstart-exec)
+     // rpc CreateSandbox(CreateSandboxRequest) returns (google.protobuf.Empty);
+     // rpc DestroySandbox(DestroySandboxRequest) returns (google.protobuf.Empty);
+     rpc OnlineCPUMem(OnlineCPUMemRequest) returns (google.protobuf.Empty);
+     rpc ReseedRandomDev(ReseedRandomDevRequest) returns (google.protobuf.Empty);
+     rpc GetGuestDetails(GuestDetailsRequest) returns (GuestDetailsResponse);
+     //rpc MemHotplugByProbe(MemHotplugByProbeRequest) returns (google.protobuf.Empty);
+     rpc SetGuestDateTime(SetGuestDateTimeRequest) returns (google.protobuf.Empty);
+     rpc CopyFile(CopyFileRequest) returns (google.protobuf.Empty);
+     rpc GetOOMEvent(GetOOMEventRequest) returns (OOMEvent);
+     //rpc AddSwap(AddSwapRequest) returns (google.protobuf.Empty);
+     //rpc GetVolumeStats(VolumeStatsRequest) returns (VolumeStatsResponse);
+     //rpc ResizeVolume(ResizeVolumeRequest) returns (google.protobuf.Empty);
 }
 
 message CreateContainerRequest {

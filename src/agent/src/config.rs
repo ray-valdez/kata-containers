@@ -438,19 +438,32 @@ impl AgentConfig {
         agent_endpoints.all_allowed || agent_endpoints.allowed.contains(ep)
     }
 
-    pub fn remove_owner_api(&self) -> Result<()> {
+    pub fn disable_owner_api(&self) -> Result<()> {
         let owner_api_list = vec![
-            "CreateContainerRequest".to_string(),
             "CopyFileRequest".to_string(),
+            "ExecProcessRequest".to_string(),
             "PauseContainerRequest".to_string(),
             "PullImageRequest".to_string(),
             "RemoveContainerRequest".to_string(),
-            "ReseedRandomRequest".to_string(),
+            "ReseedRandomDevRequest".to_string(),
             "ResumeContainerRequest".to_string(),
             "SetGuestDateTimeRequest".to_string(),
-            "StartContainerRequest".to_string(),
+            "StatsContainerRequest".to_string(),
             "TtyWinResizeRequest".to_string(),
             "UpdateContainerRequest".to_string(),
+        ];
+
+        let mut agent_endpoints = self.endpoints.write().unwrap();
+        for item in owner_api_list {
+            agent_endpoints.allowed.remove(&item);
+        }
+        Ok(())
+    }
+
+    pub fn disable_switch_api(&self) -> Result<()> {
+        let owner_api_list = vec![
+            "CreateContainerRequest".to_string(),
+            "StartContainerRequest".to_string(),
         ];
 
         let mut agent_endpoints = self.endpoints.write().unwrap();

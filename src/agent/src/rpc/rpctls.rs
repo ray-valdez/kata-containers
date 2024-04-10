@@ -872,88 +872,14 @@ fn from_file(file_path: &str) -> Result<String> {
 }
 
 fn convert_routes(route_str: String) -> Result<Vec<types::Route>, io::Error> {
-    /*
-    let mut val: Value = match serde_json::from_str::<serde_json::Value>(&route_str)
-     {
-        Ok(v) => v,
-        Err(e) => return Err(e.into())
-
-     };
-
-    for  walk_value in val.as_array_mut().unwrap() {
-        if walk_value["family"]!= json!(null) {
-            match &walk_value["family"] {
-               Value::String(item) => {
-                          match item.as_str() {
-                               "v4" => {
-                                         *walk_value.get_mut("family").unwrap() = json!(types::IpFamily::V4 as i32);
-
-                                       },
-                               "v6" => {
-                                         *walk_value.get_mut("family").unwrap() = json!(types::IpFamily::V6 as i32);
-                                       },
-                               _ => {
-                                    return Err(io::Error::new(ErrorKind::InvalidInput, "Expected string v4 or v5"));
-                            }
-
-                          }
-                }
-                _ => {
-                     return Err(io::Error::new(ErrorKind::InvalidInput, "Expected family"));
-                    }
-            }
-        }
-
-    }
-
-    let g_route: Vec<types::Route> = serde_json::from_value(val).unwrap();
-    */
     let g_route: Vec<types::Route> = serde_json::from_str(&route_str).unwrap();
+
     Ok(g_route)
 }
 
 fn convert_interface(interface_str: String) -> Result<Vec<types::Interface>, io::Error> {
-    /*
-    let mut v: Value = match serde_json::from_str::<serde_json::Value>(&interface_str)
-    {
-        Ok(v) => v,
-        Err(e) => return Err(e.into())
-
-    };
-
-    for  walk_value in v.as_array_mut().unwrap() {
-        if walk_value["IPAddresses"] != json!(null) {
-            for obj in  walk_value["IPAddresses"].as_array_mut().unwrap() {
-                if obj["family"]!= json!(null) {
-                     match &obj["family"] {
-                        Value::String(item) => {
-                                   match item.as_str() {
-                                        "v4" => {
-                                                  *obj.get_mut("family").unwrap() = json!(types::IpFamily::V4 as i32);
-                                                },
-                                        "v6" => {
-                                                  *obj.get_mut("family").unwrap() = json!(types::IpFamily::V6 as i32);
-                                                },
-                                        _ => {
-                                                return Err(io::Error::new(ErrorKind::InvalidInput, "Expected string v4 or v5"));
-                                             }
-
-                                   }
-
-                            }
-                        _ => {
-                                return Err(io::Error::new(ErrorKind::InvalidInput, "Expected family"));
-
-                              }
-                     }
-                }
-
-            }
-        }
-    }
-    let g_interface: Vec<types::Interface> = serde_json::from_value(v).unwrap();
-    */
     let g_interface: Vec<types::Interface> = serde_json::from_str(&interface_str).unwrap();
+
     Ok(g_interface)
 }
 

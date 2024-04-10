@@ -404,6 +404,13 @@ async fn start_sandbox(
         init_attestation_agent(logger, config)?;
     }
 
+    match config.disable_owner_api() {
+        Ok(_) => println!("main: Disable Owner API"),
+        Err(e) => {
+            println!("main: Unable to disable Owner API: {:?}", e)
+        }
+    };
+
     // vsock:///dev/vsock, port
     let mut server = rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
     server.start().await?;
@@ -419,11 +426,10 @@ async fn start_sandbox(
 
         // if the tls keys are downloaded and extracted, then start the grpctls server
         if secrets::tls_keys_exist() {
-            // Remove owner execlusive APIs from the host side
-            match config.remove_owner_api() {
-                Ok(_) => println!("main: Disable Owner API"),
+            match config.disable_switch_api() {
+                Ok(_) => println!("main: Disable Switch API"),
                 Err(e) => {
-                    println!("main: Unable to disable Owner API: {:?}", e)
+                    println!("main: Unable to disable Switch API: {:?}", e)
                 }
             };
 
