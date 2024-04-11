@@ -1465,6 +1465,8 @@ impl agent_ttrpc::AgentService for AgentService {
         trace_rpc_call!(ctx, "get_guest_details", req);
         is_allowed(&req).await?;
 
+        let config_split_api = &AGENT_CONFIG.split_api;
+
         info!(sl(), "get guest details!");
         let mut resp = GuestDetailsResponse::new();
         // to get memory block size
@@ -1485,8 +1487,11 @@ impl agent_ttrpc::AgentService for AgentService {
         }
 
         // to get agent details
-        let detail = get_agent_details();
-        resp.agent_details = MessageField::some(detail);
+
+        if !*config_split_api {
+            let detail = get_agent_details();
+            resp.agent_details = MessageField::some(detail);
+        };
 
         Ok(resp)
     }
@@ -1540,11 +1545,17 @@ impl agent_ttrpc::AgentService for AgentService {
         trace_rpc_call!(ctx, "get_metrics", req);
         is_allowed(&req).await?;
 
+        let config_split_api = &AGENT_CONFIG.split_api;
+
         match get_metrics(&req) {
             Err(e) => Err(ttrpc_error(ttrpc::Code::INTERNAL, e)),
             Ok(s) => {
                 let mut metrics = Metrics::new();
-                metrics.set_metrics(s);
+
+                if !*config_split_api {
+                    metrics.set_metrics(s);
+                }
+
                 Ok(metrics)
             }
         }
