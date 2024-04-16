@@ -20,13 +20,7 @@ chain has been installed using standard Rust`rustup`tool.
 
 ### Prerequisites
 
-Because this tool uses generated code from `src/libs/protocols/secprotos/secagent.proto`, set environmental variable to generated protocol files:
-
-```bash
-$ export OUT_DIR=${KATA_DIR}/src/libs/protocols/src/grpctls
-```
-    
-The tool also requires a set of client public and private key pair and the
+The tool requires a set of client public and private key pair and the
 server's CA public key certificate to establish a TLS connection with the `kata-agent`. Link tool with generated TLS keys and certificates:
 
 ```bash

@@ -11,12 +11,6 @@ chain has been installed using standard Rust`rustup`tool.
 
 ### Prerequisites
 
-Because this tool uses generated code from `src/libs/protocols/secprotos/secagent.proto`, set environmental variable to the generated protocol files:
-
-```bash
-$ export OUT_DIR=${KATA_DIR}/src/libs/protocols/src/grpctls
-```
-    
 Similar to the `kata-agent-ctl`, this tool requires an OCI bundle, please see `kata-agent-ctl`'s [prerequisites](../agent-ctl/README.md/#prerequisites).
 
 The tool also requires a set of client public and private key pair and the
