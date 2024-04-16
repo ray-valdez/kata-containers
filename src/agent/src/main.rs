@@ -404,11 +404,13 @@ async fn start_sandbox(
         init_attestation_agent(logger, config)?;
     }
 
-    match config.disable_owner_api() {
-        Ok(_) => println!("main: Disable Owner API"),
-        Err(e) => {
-            println!("main: Unable to disable Owner API: {:?}", e)
-        }
+    if config.split_api {
+        match config.disable_owner_api() {
+            Ok(_) => println!("main: Disable Owner API"),
+            Err(e) => {
+                println!("main: Unable to disable Owner API: {:?}", e)
+            }
+        };
     };
 
     // vsock:///dev/vsock, port

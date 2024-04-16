@@ -11,7 +11,6 @@ unified_cgroup_hierarchy = false
 tracing = false
 
 [endpoints]
-# "ReseedRandomDevRequest",
 allowed = [
         "AddARPNeighborsRequest",
         "AddSwapRequest",
@@ -31,6 +30,7 @@ allowed = [
         "PauseContainerRequest",
         "PullImageRequest",
         "ReadStreamRequest",
+        "ReseedRandomDevRequest",
         "RemoveContainerRequest",
         "ResumeContainerRequest",
         "SetGuestDateTimeRequest",

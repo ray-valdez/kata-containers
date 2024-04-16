@@ -66,11 +66,6 @@ $ make -C ${dir}/kata-containers/src/agent
 >$ popd
 >```
 > 
-> Set environmental variable to the generated grpc tls protocol files:
->```sh
->$ export OUT_DIR=${dir}/kata-containers/src/libs/protocols/src/grpctls
->$ make -C ${dir}/kata-containers/src/agent
->
 
 ## Change the agent API
 

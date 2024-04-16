@@ -70,6 +70,8 @@ The gRPC TLS channel facilitates the split api feature, which restricts access t
   ```bash
   $ export distro=ubuntu
   $ export ROOTFS_DIR=$PWD/rootfs
+  $ export KATA_BUILD_CC=yes
+
   ```
 
 3. Build root image, assuming running on a TDX host
