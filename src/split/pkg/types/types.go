@@ -6,7 +6,7 @@
 package types
 
 const (
-	DefaultKataRuntimeName    = "io.containerd.kata.v2"
+	DefaultKataRuntimeName    = "io.containerd.split.v2"
 	KataRuntimeNameRegexp     = `io\.containerd\.kata.*\.v2`
 	ContainerdRuntimeTaskPath = "io.containerd.runtime.v2.task"
 )

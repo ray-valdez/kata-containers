@@ -40,7 +40,8 @@ else
 endif
 
 PROJECT_TYPE = kata
-PROJECT_NAME = Kata Containers
+#PROJECT_NAME = Kata Containers
+PROJECT_NAME = Split API
 PROJECT_TAG = kata-containers
 PROJECT_ORG = $(PROJECT_TAG)
 PROJECT_URL = https://github.com/$(PROJECT_ORG)
