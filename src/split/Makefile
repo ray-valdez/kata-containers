@@ -298,7 +298,7 @@ DEFSNPGUESTPOLICY ?= 0x30000
 SED = sed
 
 CLI_DIR = cmd
-SHIMV2 = containerd-shim-kata-v2
+SHIMV2 = containerd-shim-split-v2
 SHIMV2_OUTPUT = $(CURDIR)/$(SHIMV2)
 SHIMV2_DIR = $(CLI_DIR)/$(SHIMV2)
 

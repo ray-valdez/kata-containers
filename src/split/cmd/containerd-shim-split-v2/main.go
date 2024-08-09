@@ -21,10 +21,18 @@ func shimConfig(config *shimapi.Config) {
 	config.NoSubreaper = true
 }
 
+// name of the project tags
+const (
+	PROJECT                = "Split API"
+	VERSION                = "0.1"
+	COMMIT                 = "TBD"
+	DefaultKataRuntimeName = "io.containerd.split.v2"
+)
+
 func main() {
 
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		fmt.Printf("%s containerd shim (Golang): id: %q, version: %s, commit: %v\n", katautils.PROJECT, types.DefaultKataRuntimeName, katautils.VERSION, katautils.COMMIT)
+		fmt.Printf("%s containerd shim (Golang): id: %q, version: %s, commit: %v\n", PROJECT, DefaultKataRuntimeName, katautils.VERSION, katautils.COMMIT)
 		os.Exit(0)
 	}
 
