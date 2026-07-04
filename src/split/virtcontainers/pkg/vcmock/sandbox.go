@@ -15,7 +15,9 @@ import (
 	"github.com/kata-containers/split/src/runtime/pkg/device/config"
 	vc "github.com/kata-containers/split/src/runtime/virtcontainers"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/image"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )

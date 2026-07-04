@@ -71,6 +71,7 @@ func wait(ctx context.Context, s *service, c *container, execID string) (int32, 
 
 		if c.cType.IsSandbox() {
 			// cancel watcher
+			/* FIXME:: enable?
 			if s.monitor != nil {
 				shimLog.WithField("sandbox", s.sandbox.ID()).Info("cancel watcher")
 				s.monitor <- nil
@@ -82,6 +83,7 @@ func wait(ctx context.Context, s *service, c *container, execID string) (int32, 
 			if err = s.sandbox.Delete(ctx); err != nil {
 				shimLog.WithField("sandbox", s.sandbox.ID()).Error("failed to delete sandbox")
 			}
+			*/
 		} else {
 			if _, err = s.sandbox.StopContainer(ctx, c.id, true); err != nil {
 				shimLog.WithError(err).WithField("container", c.id).Warn("stop container failed")

@@ -38,6 +38,7 @@ import (
 	"github.com/kata-containers/split/src/runtime/pkg/utils"
 	vc "github.com/kata-containers/split/src/runtime/virtcontainers"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/compatoci"
+	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/proxy"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/types"
 )
 
@@ -62,12 +63,13 @@ var (
 	_     taskAPI.TaskService = (taskAPI.TaskService)(&service{})
 )
 
+// Split customization
 // concrete virtcontainer implementation
-var vci vc.VC = &vc.VCImpl{}
+var vci vc.VC = &proxy.VCMock{}
 
 // shimLog is logger for shim package
 var shimLog = logrus.WithFields(logrus.Fields{
-	"source": "containerd-kata-shim-v2",
+	"source": "containerd-split-shim-v2",
 	"name":   "containerd-shim-v2",
 })
 
@@ -120,7 +122,7 @@ type exit struct {
 	status    int
 }
 
-// service is the shim implementation of a remote shim over GRPC
+// service is the shim implementation of a remote shim over TLS
 type service struct {
 	sandbox vc.VCSandbox
 
@@ -355,6 +357,7 @@ func (s *service) Cleanup(ctx context.Context) (_ *taskAPI.DeleteResponse, err e
 	}
 
 	switch containerType {
+	/* Associated with a  init container and non pod container */
 	case vc.PodSandbox, vc.SingleContainer:
 		err = cleanupContainer(spanCtx, s.id, s.id, path)
 		if err != nil {
@@ -391,9 +394,11 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	//D shimLog.WithField("container", r.ID).Debug("RV Create() 2 start")
 	if err := katautils.VerifyContainerID(r.ID); err != nil {
 		return nil, err
 	}
+	//D shimLog.WithField("container", r.ID).Debug("RV Create() 3 start")
 
 	type Result struct {
 		container *container
@@ -405,17 +410,27 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		ch <- Result{container, err}
 	}()
 
+	shimLog.WithField("container", r.ID).Debug("RV Create() 4 start")
 	select {
 	case <-ctx.Done():
+		shimLog.WithField("container", r.ID).Debug("RV Create() 5 Done start")
 		return nil, errors.Errorf("create container timeout: %v", r.ID)
 	case res := <-ch:
+		shimLog.WithField("container", r.ID).Debug("RV Create() 5 res  start")
 		if res.err != nil {
+			shimLog.WithError(res.err).WithField("container", r.ID).Debug("RV Create() 5 ERROR start")
+
 			return nil, res.err
 		}
+		//D shimLog.WithField("Bundle", r.Bundle).Debug("RV Create() 6 Bundle")
+		//D shimLog.WithField("Roofts", r.Rootfs).Debug("RV Create() 7 Rootfs")
 		container := res.container
 		container.status = task.StatusCreated
 
 		s.containers[r.ID] = container
+
+		// Split: setting shim processs ID as the hypersivor's pid
+		s.hpid = uint32(os.Getpid())
 
 		s.send(&eventstypes.TaskCreate{
 			ContainerID: r.ID,
@@ -431,11 +446,173 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 			Pid:        s.hpid,
 		})
 
+		shimLog.WithField("container", r.ID).Debug("RV Create() 8 taskAPI hpid:", s.hpid)
+
 		return &taskAPI.CreateTaskResponse{
 			Pid: s.hpid,
 		}, nil
 	}
 }
+
+/*
+
+// te Start the primary user process inside the container
+func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
+	fmt.Println("Start : RV")
+	log.G(ctx).Infof("Start: RVV")
+	return nil, errdefs.ErrNotImplemented
+}
+*/
+
+// Delete a process or container
+/*
+func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
+	log.G(ctx).Infof("Delete: RVV")
+	fmt.Println("Delete : RV")
+	return nil, errdefs.ErrNotImplemented
+}
+*/
+
+// Exec an additional process inside the container
+func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
+	shimLog.WithField("container", r.ID).Debug("Exec() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// ResizePty of a process
+func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
+	shimLog.WithField("container", r.ID).Debug("Resize() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// State returns runtime state of a process
+/*
+func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
+	fmt.Println("State : RV")
+	return nil, errdefs.ErrNotImplemented
+}
+// Pause the container
+
+func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
+	//fmt.Println("Pause : RV TBD")
+	shimLog.WithField("container", r.ID).Debug("Pause() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+*/
+
+// Resume the container
+/*
+func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
+	fmt.Println("Resume : RV")
+	return nil, errdefs.ErrNotImplemented
+}
+*/
+
+// Kill a process
+/*
+func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Empty, error) {
+	log.G(ctx).Infof("Kill: RVV")
+	fmt.Println("Kill: RV")
+	return nil, errdefs.ErrNotImplemented
+}
+*/
+
+/*
+// Pids returns all pids inside the container
+func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.PidsResponse, error) {
+	shimLog.WithField("container", r.ID).Debug("Pids() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// CloseIO of a process
+func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
+	shimLog.WithField("container", r.ID).Debug("CloseIO() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// Checkpoint the container
+func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskRequest) (*ptypes.Empty, error) {
+	shimLog.WithField("container", r.ID).Debug("Checkpoint() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// Connect returns shim information of the underlying service
+func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
+	fmt.Println("Connect : RV")
+	return nil, errdefs.ErrNotImplemented
+}
+*/
+
+// Shutdown is called after the underlying resources of the shim are cleaned up and the service can be stopped
+/*
+func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+	fmt.Println("Shutdown : RV")
+	os.Exit(0)
+	return &ptypes.Empty{}, nil
+}
+*/
+
+/*
+// Stats returns container level system stats for a container and its processes
+func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
+	shimLog.WithField("container", r.ID).Debug("Stats() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// Update the live container
+func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*ptypes.Empty, error) {
+	shimLog.WithField("container", r.ID).Debug("Update() shim TBD")
+	return nil, errdefs.ErrNotImplemented
+}
+
+// Wait for a process to exit
+func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (_ *taskAPI.WaitResponse, err error) {
+	shimLog.WithField("container", r.ID).Debug("Wait() start")
+	defer shimLog.WithField("container", r.ID).Debug("Wait() end")
+	span, _ := katatrace.Trace(s.rootCtx, shimLog, "Wait", shimTracingTags)
+	defer span.End()
+
+	var ret uint32
+
+	start := time.Now()
+	defer func() {
+		err = toGRPC(err)
+		rpcDurationsHistogram.WithLabelValues("wait").Observe(float64(time.Since(start).Nanoseconds() / int64(time.Millisecond)))
+	}()
+
+	s.mu.Lock()
+	c, err := s.getContainer(r.ID)
+	s.mu.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+
+	//wait for container
+	if r.ExecID == "" {
+		ret = <-c.exitCh
+
+		// refill the exitCh with the container process's exit code in case
+		// there were other waits on this process.
+		c.exitCh <- ret
+	} else { //wait for exec
+		execs, err := c.getExec(r.ExecID)
+		if err != nil {
+			return nil, err
+		}
+		ret = <-execs.exitCh
+
+		// refill the exitCh with the exec process's exit code in case
+		// there were other waits on this process.
+		execs.exitCh <- ret
+	}
+
+	return &taskAPI.WaitResponse{
+		ExitStatus: ret,
+		ExitedAt:   c.exitTime,
+	}, nil
+}
+*/
 
 // Start a process
 func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAPI.StartResponse, err error) {
@@ -443,6 +620,8 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAP
 	defer shimLog.WithField("container", r.ID).Debug("Start() end")
 	span, spanCtx := katatrace.Trace(s.rootCtx, shimLog, "Start", shimTracingTags)
 	defer span.End()
+	// RV: replace
+	_ = spanCtx
 
 	start := time.Now()
 	defer func() {
@@ -455,6 +634,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAP
 
 	c, err := s.getContainer(r.ID)
 	if err != nil {
+		shimLog.WithField("container", r.ID).Debug("RV Start() error 1")
 		return nil, err
 	}
 
@@ -464,8 +644,11 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAP
 
 	//start a container
 	if r.ExecID == "" {
+		shimLog.WithField("container", r.ID).Debug("RV Start() ExecID CONTAINER")
+		shimLog.WithField("sandbox", s.hpid).Debug("RV Start() ExecID SANDBOX")
 		err = startContainer(spanCtx, s, c)
 		if err != nil {
+			shimLog.WithField("container", r.ID).Debug("RV Start() error 2")
 			return nil, errdefs.ToGRPC(err)
 		}
 		s.send(&eventstypes.TaskStart{
@@ -473,22 +656,28 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAP
 			Pid:         s.hpid,
 		})
 	} else {
+		shimLog.WithField("container", r.ID).Debug("RV Start() Else")
 		//start an exec
-		_, err = startExec(spanCtx, s, r.ID, r.ExecID)
-		if err != nil {
-			return nil, errdefs.ToGRPC(err)
-		}
-		s.send(&eventstypes.TaskExecStarted{
-			ContainerID: c.id,
-			ExecID:      r.ExecID,
-			Pid:         s.hpid,
-		})
+		/*
+			_, err = startExec(spanCtx, s, r.ID, r.ExecID)
+			if err != nil {
+				return nil, errdefs.ToGRPC(err)
+			}
+			s.send(&eventstypes.TaskExecStarted{
+				ContainerID: c.id,
+				ExecID:      r.ExecID,
+				Pid:         s.hpid,
+			})
+		*/
 	}
 
+	shimLog.WithField("container", r.ID).Debug("RV Start() end")
 	return &taskAPI.StartResponse{
 		Pid: s.hpid,
 	}, nil
 }
+
+/* */
 
 // Delete the initial process and container
 func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (_ *taskAPI.DeleteResponse, err error) {
@@ -544,6 +733,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (_ *task
 	}, nil
 }
 
+/*
 // Exec an additional process inside the container
 func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (_ *ptypes.Empty, err error) {
 	shimLog.WithField("container", r.ID).Debug("Exec() start")
@@ -624,8 +814,9 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (_
 
 	return empty, err
 }
-
+*/
 // State returns runtime state information for a process
+
 func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (_ *taskAPI.StateResponse, err error) {
 	shimLog.WithField("container", r.ID).Debug("State() start")
 	defer shimLog.WithField("container", r.ID).Debug("State() end")
@@ -751,7 +942,6 @@ func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (_ *ptyp
 		})
 		return empty, nil
 	}
-
 	if status, err := s.getContainerStatus(c.id); err != nil {
 		c.status = task.StatusUnknown
 	} else {
@@ -781,14 +971,26 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (_ *ptypes.E
 
 	c, err := s.getContainer(r.ID)
 	if err != nil {
+		shimLog.WithField("RV container", r.ID).Debug("Kill() k1 getContainer")
 		return nil, err
+
 	}
 
 	processStatus := c.status
 	processID := c.id
+	shimLog.WithField("RV processID", processID).Debug("Kill() k2 before check")
+	// RV: short circuit container ID equals sandbox there's NO pocess is running!!
+	/*
+		if r.ID == s.sandbox.ID() {
+			shimLog.WithField("RV sandboxID", r.ID).Debug("Kill() k11")
+			return empty, s.sandbox.SignalProcess(spanCtx, c.id, processID, signum, true)
+		}
+	*/
+
 	if r.ExecID != "" {
 		execs, err := c.getExec(r.ExecID)
 		if err != nil {
+			shimLog.WithField("RV container", r.ID).Debug("Kill() k3 getExec")
 			return nil, err
 		}
 		processID = execs.id
@@ -812,6 +1014,10 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (_ *ptypes.E
 	// send a SIGKILL signal first to try to stop the container, thus
 	// once the container has terminated, here should ignore this signal
 	// and return directly.
+	shimLog.WithField("RV container", c.id).Debug("Kill() k4 getContainer")
+	shimLog.WithField("RV signum", signum).Debug("Kill() k5 getContainer")
+	shimLog.WithField("RV processStatus", processStatus).Debug("Kill() k6 getContainer")
+
 	if (signum == syscall.SIGKILL || signum == syscall.SIGTERM) && processStatus == task.StatusStopped {
 		shimLog.WithFields(logrus.Fields{
 			"sandbox":   s.sandbox.ID(),
@@ -821,6 +1027,7 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (_ *ptypes.E
 		return empty, nil
 	}
 
+	shimLog.WithField("RV container", signum).Debug("Kill() k7 getContainer")
 	return empty, s.sandbox.SignalProcess(spanCtx, c.id, processID, signum, r.All)
 }
 
@@ -1010,6 +1217,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (_ *taskAP
 }
 
 // Update a running container
+
 func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (_ *ptypes.Empty, err error) {
 	shimLog.WithField("container", r.ID).Debug("Update() start")
 	defer shimLog.WithField("container", r.ID).Debug("Update() end")
@@ -1044,6 +1252,7 @@ func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (_ *
 }
 
 // Wait for a process to exit
+
 func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (_ *taskAPI.WaitResponse, err error) {
 	shimLog.WithField("container", r.ID).Debug("Wait() start")
 	defer shimLog.WithField("container", r.ID).Debug("Wait() end")

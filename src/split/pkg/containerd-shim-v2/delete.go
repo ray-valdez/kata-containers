@@ -7,10 +7,8 @@ package containerdshim
 
 import (
 	"context"
-	"path"
 
 	"github.com/containerd/containerd/api/types/task"
-	"github.com/containerd/containerd/mount"
 	"github.com/kata-containers/split/src/runtime/pkg/katautils"
 )
 
@@ -33,13 +31,14 @@ func deleteContainer(ctx context.Context, s *service, c *container) error {
 		// https://github.com/opencontainers/runtime-spec/blob/master/runtime.md#lifecycle
 		shimLog.WithError(err).Warn("Failed to run post-stop hooks")
 	}
-
-	if c.mounted {
-		rootfs := path.Join(c.bundle, "rootfs")
-		if err := mount.UnmountAll(rootfs, 0); err != nil {
-			shimLog.WithError(err).Warn("failed to cleanup rootfs mount")
+	/*
+		if c.mounted {
+			rootfs := path.Join(c.bundle, "rootfs")
+			if err := mount.UnmountAll(rootfs, 0); err != nil {
+				shimLog.WithError(err).Warn("failed to cleanup rootfs mount")
+			}
 		}
-	}
+	*/
 
 	delete(s.containers, c.id)
 

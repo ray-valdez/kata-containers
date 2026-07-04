@@ -27,8 +27,11 @@ import (
 
 	volume "github.com/kata-containers/split/src/runtime/pkg/direct-volume"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/persist"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
 	pb "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols/grpc"
+
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	vcAnnotations "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/annotations"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/mock"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/rootless"

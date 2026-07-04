@@ -243,6 +243,8 @@ func (s *service) genericIPTablesHandler(w http.ResponseWriter, r *http.Request,
 
 func (s *service) startManagementServer(ctx context.Context, ociSpec *specs.Spec) {
 	// metrics socket will under sandbox's bundle path
+	// RV: unused ctx
+	_ = ctx
 	metricsAddress := ServerSocketAddress(s.id)
 
 	listener, err := cdshim.NewSocket(metricsAddress)

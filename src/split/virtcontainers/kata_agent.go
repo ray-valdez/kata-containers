@@ -27,9 +27,12 @@ import (
 	"github.com/kata-containers/split/src/runtime/pkg/uuid"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/image"
 	persistapi "github.com/kata-containers/split/src/runtime/virtcontainers/persist/api"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
 	kataclient "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols/client"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols/grpc"
+
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	vcAnnotations "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/annotations"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/rootless"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/types"
@@ -84,7 +87,7 @@ type customRequestTimeoutKeyType struct{}
 
 var (
 	checkRequestTimeout              = 30 * time.Second
-	defaultRequestTimeout            = 60 * time.Second
+	defaultRequestTimeout           = 60 * time.Second
 	imageRequestTimeout              = 60 * time.Second
 	remoteRequestTimeout             = 300 * time.Second
 	customRequestTimeoutKey          = customRequestTimeoutKeyType(struct{}{})
@@ -389,6 +392,7 @@ func (k *kataAgent) agentURL() (string, error) {
 		return s.String(), nil
 	case types.MockHybridVSock:
 		return s.String(), nil
+	// TBD: RV Do we need to case for split tenant
 	default:
 		return "", fmt.Errorf("Invalid socket type")
 	}
@@ -751,7 +755,7 @@ func (k *kataAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 	if len(hostname) > maxHostnameLen {
 		hostname = hostname[:maxHostnameLen]
 	}
-
+	// RV: not need for dns
 	dns, err := k.getDNS(sandbox)
 	if err != nil {
 		return err
@@ -770,21 +774,24 @@ func (k *kataAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 		}
 
 		// Setup network interfaces and routes
-		interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
-		if err != nil {
-			return err
-		}
-		if err = k.updateInterfaces(ctx, interfaces); err != nil {
-			return err
-		}
-		if _, err = k.updateRoutes(ctx, routes); err != nil {
-			return err
-		}
-		if err = k.addARPNeighbors(ctx, neighs); err != nil {
-			return err
-		}
+		// RV: I don't need
+		/*
+			interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
+			if err != nil {
+				return err
+			}
+			if err = k.updateInterfaces(ctx, interfaces); err != nil {
+				return err
+			}
+			if _, err = k.updateRoutes(ctx, routes); err != nil {
+				return err
+			}
+			if err = k.addARPNeighbors(ctx, neighs); err != nil {
+				return err
+			}
 
-		kmodules = setupKernelModules(k.kmodules)
+			kmodules = setupKernelModules(k.kmodules)
+		*/
 	}
 	// If a Policy has been specified, send it to the agent.
 	if len(sandbox.config.AgentConfig.Policy) > 0 {
@@ -793,7 +800,6 @@ func (k *kataAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 		}
 	}
 
-	
 	storages := setupStorages(ctx, sandbox)
 
 	req := &grpc.CreateSandboxRequest{

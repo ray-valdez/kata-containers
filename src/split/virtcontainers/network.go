@@ -20,7 +20,9 @@ import (
 
 	"github.com/kata-containers/split/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/split/src/runtime/pkg/uuid"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/utils"
 )
 

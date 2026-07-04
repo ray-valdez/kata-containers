@@ -64,6 +64,7 @@ func (fi *fileIO) Close() error {
 	} else if fi.errw != nil {
 		return wc(fi.errw)
 	}
+
 	return nil
 }
 

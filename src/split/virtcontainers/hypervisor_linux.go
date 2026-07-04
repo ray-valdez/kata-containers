@@ -42,6 +42,9 @@ func NewHypervisor(hType HypervisorType) (Hypervisor, error) {
 		return &remoteHypervisor{}, nil
 	case MockHypervisor:
 		return &mockHypervisor{}, nil
+	case ProxyHypervisor:
+		return &proxyHypervisor{}, nil
+
 	default:
 		return nil, fmt.Errorf("Unknown hypervisor type %s", hType)
 	}

@@ -54,7 +54,8 @@ func init() {
 
 	// disable shim management server.
 	// all tests are not using this, so just set it to nil
-	defaultStartManagementServerFunc = nil
+	// RV: this in the create
+	// defaultStartManagementServerFunc = nil
 }
 
 func createEmptyFile(path string) (err error) {

@@ -35,6 +35,8 @@ func openLogFile(path string) (*os.File, error) {
 }
 
 func newFileIO(ctx context.Context, stdio *stdio, uri *url.URL) (*fileIO, error) {
+	// RV: unused
+	_ = ctx
 	var outw, errw, f io.WriteCloser
 	var err error
 

@@ -13,7 +13,9 @@ import (
 	"github.com/kata-containers/split/src/runtime/pkg/device/api"
 	"github.com/kata-containers/split/src/runtime/pkg/device/config"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/image"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -85,6 +87,9 @@ type VCSandbox interface {
 	image.ImageService
 	GetIPTables(ctx context.Context, isIPv6 bool) ([]byte, error)
 	SetIPTables(ctx context.Context, isIPv6 bool, data []byte) error
+
+	// RV: new get listContainers GetAgentContainers
+	GetAgentContainers(ctx context.Context) (string, error)
 }
 
 // VCContainer is the Container interface

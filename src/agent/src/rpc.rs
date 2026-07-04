@@ -53,10 +53,15 @@ use nix::sys::{stat, statfs};
 use nix::unistd::{self, Pid};
 use rustjail::process::ProcessOperations;
 
+use protocols::image_ttrpc_async::Image;
+//use protocols::image_ttrpc_async::create_image;
+
 use crate::device::{
     add_devices, get_virtio_blk_pci_device_name, update_device_cgroup, update_env_pci,
 };
 use crate::image_rpc;
+use crate::ImageService;
+use crate::image_rpc::SharedImageService;
 use crate::linux_abi::*;
 use crate::metrics::get_metrics;
 use crate::mount::baremount;
@@ -226,16 +231,16 @@ impl AgentService {
             }
         };
 
+        info!( sl(), "receive createcontainer, storages: {:?}", &req.storages);
+
+        debug!(sl(), "AGENT-receive createcontainer (#), spec: {:#?}", &oci);
         info!(sl(), "receive createcontainer, spec: {:?}", &oci);
-        info!(
-            sl(),
-            "receive createcontainer, storages: {:?}", &req.storages
-        );
 
         // In case of pulling image inside guest, we need to merge the image bundle OCI spec
         // into the container creation request OCI spec.
         let image_service = image_rpc::ImageService::singleton().await?;
         image_service.merge_bundle_oci(&mut oci).await?;
+        debug!(sl(), "AGENT-merge_bundle_oci, spec: {:#?}", &oci);
 
         // Some devices need some extra processing (the ones invoked with
         // --device for instance), and that's what this call is doing. It
@@ -1799,6 +1804,7 @@ pub async fn start(
     s: Arc<Mutex<Sandbox>>,
     server_address: &str,
     init_mode: bool,
+    image_service: Arc<ImageService>,
 ) -> Result<TtrpcServer> {
     let agent_service = Box::new(AgentService {
         sandbox: s.clone(),
@@ -1810,12 +1816,28 @@ pub async fn start(
 
     let health_service = Box::new(HealthService {}) as Box<dyn health_ttrpc::Health + Send + Sync>;
     let hservice = health_ttrpc::create_health(Arc::new(health_service));
-
+    /*
     let image_service = image_rpc::ImageService::new();
     *image_rpc::IMAGE_SERVICE.lock().await = Some(image_service.clone());
     let image_service =
         Arc::new(Box::new(image_service) as Box<dyn image_ttrpc::Image + Send + Sync>);
     let iservice = image_ttrpc::create_image(image_service);
+     */
+    // Error
+    //let iservice = image_ttrpc::create_image(
+    //   Arc::new(Box::new(image_service.clone()) as Box<dyn image_ttrpc::Image + Send + Sync>)) ;
+    // Error 2
+    //let iservice = image_ttrpc::create_image(
+    //    Box::new(image_service.clone()) as Box<dyn image_ttrpc::Image + Send + Sync>) ;
+
+    // Error 3
+    //let boxed_image: Box<dyn image_ttrpc::Image + Send + Sync> = Box::new(image_service.clone());
+    //let arc_boxed_image = Arc::new(boxed_image);
+    //let iservice = image_ttrpc::create_image(arc_boxed_image);
+
+    //  
+    let shared = SharedImageService(image_service.clone());
+    let iservice  = image_ttrpc:: create_image(Arc::new(Box::new(shared) as Box<dyn Image + Send + Sync>));
 
     let server = TtrpcServer::new()
         .bind(server_address)?

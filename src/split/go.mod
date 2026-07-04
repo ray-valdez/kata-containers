@@ -28,6 +28,7 @@ require (
 	github.com/go-openapi/validate v0.22.0
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gogo/protobuf v1.3.2
+	github.com/golang/protobuf v1.5.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/intel-go/cpuid v0.0.0-20210602155658-5747e5cec0d9
 	github.com/mdlayher/vsock v1.1.0
@@ -84,7 +85,6 @@ require (
 	github.com/go-openapi/spec v0.20.4 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect

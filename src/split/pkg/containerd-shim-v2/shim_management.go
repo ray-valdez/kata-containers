@@ -40,6 +40,7 @@ const (
 	IPTablesUrl           = "/iptables"
 	IP6TablesUrl          = "/ip6tables"
 	MetricsUrl            = "/metrics"
+	ContainersUrl         = "/containers"
 )
 
 var (
@@ -62,6 +63,23 @@ func (s *service) agentURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, url)
+}
+
+// serveContainers handle /containers requests
+func (s *service) serveContainers(w http.ResponseWriter, r *http.Request) {
+
+	// can not pass context to serveMetrics, so use background context
+	containers, err := s.sandbox.GetAgentContainers(context.Background())
+
+	if err != nil {
+		shimMgtLog.WithError(err).Error("failed GetAgentContainers")
+		if isGRPCErrorCode(codes.NotFound, err) {
+			shimMgtLog.Warn("containers API not supportted by this agent.")
+			ifSupportAgentMetricsAPI = false
+			return
+		}
+	}
+	fmt.Fprint(w, containers)
 }
 
 // serveMetrics handle /metrics requests
@@ -90,7 +108,6 @@ func (s *service) serveMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get metrics from agent
 	// can not pass context to serveMetrics, so use background context
 	agentMetrics, err := s.sandbox.GetAgentMetrics(context.Background())
 	if err != nil {
@@ -113,6 +130,9 @@ func (s *service) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	// collect pod overhead metrics need sleep to get the changes of cpu/memory resources usage
 	// so here only trigger the collect operation, and the data will be gathered
 	// next time collection request from Prometheus server
+
+	// FIXME: temporary disable?
+
 	go s.setPodOverheadMetrics(context.Background())
 }
 
@@ -267,6 +287,7 @@ func (s *service) startManagementServer(ctx context.Context, ociSpec *specs.Spec
 	m.Handle(DirectVolumeResizeUrl, http.HandlerFunc(s.serveVolumeResize))
 	m.Handle(IPTablesUrl, http.HandlerFunc(s.ipTablesHandler))
 	m.Handle(IP6TablesUrl, http.HandlerFunc(s.ip6TablesHandler))
+	m.Handle(ContainersUrl, http.HandlerFunc(s.serveContainers))
 	s.mountPprofHandle(m, ociSpec)
 
 	// register shim metrics
@@ -304,7 +325,9 @@ func (s *service) mountPprofHandle(m *http.ServeMux, ociSpec *specs.Spec) {
 
 // GetSandboxesStoragePath returns the storage path where sandboxes info are stored
 func GetSandboxesStoragePath() string {
-	return "/run/vc/sbs"
+	// Split: Replace "/run/vc/sbs"
+	// Note: UNIX_PATH_MAX is 108!
+	return "/tmp/run/vc/sbs"
 }
 
 // GetSandboxesStoragePathRust returns the storage path where sandboxes info are stored in runtime-rs

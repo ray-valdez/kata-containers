@@ -35,6 +35,8 @@ type binaryIO struct {
 
 // https://github.com/containerd/containerd/blob/v1.6.6/pkg/process/io.go#L248
 func newBinaryIO(ctx context.Context, ns, id string, uri *url.URL) (bio *binaryIO, err error) {
+	// RV: unused
+	_ = ctx
 	var closers []func() error
 	defer func() {
 		if err == nil {

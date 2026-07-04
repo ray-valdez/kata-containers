@@ -14,7 +14,9 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	ktu "github.com/kata-containers/split/src/runtime/pkg/katatestutils"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink"

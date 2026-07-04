@@ -16,7 +16,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
@@ -24,9 +23,9 @@ import (
 	"github.com/containerd/containerd/mount"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/typeurl"
-	"github.com/kata-containers/split/src/runtime/pkg/utils"
 	"github.com/kata-containers/split/src/runtime/virtcontainers"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/annotations"
+	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/compatoci"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/rootless"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -41,8 +40,8 @@ import (
 	"github.com/kata-containers/split/src/runtime/pkg/katautils"
 	"github.com/kata-containers/split/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/split/src/runtime/pkg/oci"
+	"github.com/kata-containers/split/src/runtime/pkg/utils"
 	vc "github.com/kata-containers/split/src/runtime/virtcontainers"
-	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/compatoci"
 )
 
 type startManagementServerFunc func(s *service, ctx context.Context, ociSpec *specs.Spec)
@@ -68,6 +67,7 @@ var defaultStartManagementServerFunc startManagementServerFunc = func(s *service
 // expected to be handled by the orchestrator). Because of this focus, the CDI
 // specification is simple to implement and allows great flexibility for
 // runtimes and orchestrators.
+
 func withCDI(annotations map[string]string, cdiSpecDirs []string, spec *specs.Spec) (*specs.Spec, error) {
 	// Add devices from CDI annotations
 	_, devsFromAnnotations, err := cdi.ParseAnnotations(annotations)
@@ -108,6 +108,8 @@ func withCDI(annotations map[string]string, cdiSpecDirs []string, spec *specs.Sp
 	return spec, nil
 }
 
+// RV: no need to copy or mount layers
+/*
 func copyLayersToMounts(rootFs *vc.RootFs, spec *specs.Spec) error {
 	for _, o := range rootFs.Options {
 		if !strings.HasPrefix(o, annotations.FileSystemLayer) {
@@ -129,8 +131,11 @@ func copyLayersToMounts(rootFs *vc.RootFs, spec *specs.Spec) error {
 
 	return nil
 }
+*/
 
 func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*container, error) {
+	shimLog.WithField("service->create ", 60).Debug("RV create() 6")
+	//shimLog.WithField("container", r.ID).Debug("RV Create() 5 Done start")
 	rootFs := vc.RootFs{}
 	if len(r.Rootfs) == 1 {
 		m := r.Rootfs[0]
@@ -142,23 +147,34 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 	detach := !r.Terminal
 	ociSpec, bundlePath, err := loadSpec(r)
 
+	shimLog.WithField("service->create ", 61).Debug("RV create() rootFs %+v: ", rootFs)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := copyLayersToMounts(&rootFs, ociSpec); err != nil {
-		return nil, err
-	}
+	// RV No need to mount
+	/*
+		if err := copyLayersToMounts(&rootFs, ociSpec); err != nil {
+			return nil, err
+		}
+	*/
 
 	containerType, err := oci.ContainerType(*ociSpec)
+	shimLog.WithField("service->create ", 62).Debug("RV create() 6")
 	if err != nil {
 		return nil, err
 	}
 
 	disableOutput := noNeedForOutput(detach, ociSpec.Process.Terminal)
+	shimLog.WithField("service->create ", 63).Debug("RV create() 6")
 	rootfs := filepath.Join(r.Bundle, "rootfs")
+	shimLog.WithField("service->create->rootfs ", rootfs).Debug("RV create() 6")
+
+	// RV
+	_ = disableOutput
+	_ = rootfs
 
 	runtimeConfig, err := loadRuntimeConfig(s, r, ociSpec.Annotations)
+	shimLog.WithField("service->create ", 64).Debug("RV create() 6")
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +184,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		if s.sandbox != nil {
 			return nil, fmt.Errorf("cannot create another sandbox in sandbox: %s", s.sandbox.ID())
 		}
+		shimLog.WithField("service->create ", 65).Debug("RV create() 6")
 		// We can provide additional directories where to search for
 		// CDI specs if needed. immutable OS's only have specific
 		// directories where applications can write too. For instance /opt/cdi
@@ -179,6 +196,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 			return nil, fmt.Errorf("adding CDI devices failed")
 		}
 
+		shimLog.WithField("service->create ", 66).Debug("RV create() 6")
 		s.config = runtimeConfig
 
 		// create tracer
@@ -190,6 +208,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 			JaegerPassword: s.config.JaegerPassword,
 		}
 		_, err = katatrace.CreateTracer("kata", jaegerConfig)
+		shimLog.WithField("service->create ", 67).Debug("RV create() 6")
 		if err != nil {
 			return nil, err
 		}
@@ -201,6 +220,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		s.rootSpan = rootSpan
 
 		// create span
+
 		span, newCtx := katatrace.Trace(s.rootCtx, shimLog, "create", shimTracingTags)
 		s.ctx = newCtx
 		defer span.End()
@@ -213,59 +233,72 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		//   2. If this is not a sandbox infrastructure container, but instead a standalone single container (analogous to "docker run..."),
 		//	then the container spec itself will contain appropriate sizing information for the entire sandbox (since it is
 		//	a single container.
+		/* RV: Don't need
 		if containerType == vc.PodSandbox {
 			s.config.SandboxCPUs, s.config.SandboxMemMB = oci.CalculateSandboxSizing(ociSpec)
 		} else {
 			s.config.SandboxCPUs, s.config.SandboxMemMB = oci.CalculateContainerSizing(ociSpec)
 		}
-
-		if rootFs.Mounted, err = checkAndMount(s, r); err != nil {
-			return nil, err
-		}
-
-		defer func() {
-			if err != nil && rootFs.Mounted {
-				if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
-					shimLog.WithField("container-type", containerType).WithError(err2).Warn("failed to cleanup rootfs mount")
-				}
+		*/
+		/*
+			// RV: no need to mount nor unmount
+			if rootFs.Mounted, err = checkAndMount(s, r); err != nil {
+				return nil, err
 			}
-		}()
+
+			defer func() {
+				if err != nil && rootFs.Mounted {
+					if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
+						shimLog.WithField("container-type", containerType).WithError(err2).Warn("failed to cleanup rootfs mount")
+					}
+				}
+			}()
+		*/
 
 		katautils.HandleFactory(ctx, vci, s.config)
 		rootless.SetRootless(s.config.HypervisorConfig.Rootless)
 		if rootless.IsRootless() {
 			if err := configureNonRootHypervisor(s.config, r.ID); err != nil {
+				shimLog.WithField("service->create ", 68).Debug("RV create() 6 error")
 				return nil, err
 			}
 		}
+		shimLog.WithField("service->create ", 68).Debug("RV create() 6")
 
 		// Pass service's context instead of local ctx to CreateSandbox(), since local
 		// ctx will be canceled after this rpc service call, but the sandbox will live
 		// across multiple rpc service calls.
-		//
-		sandbox, _, err := katautils.CreateSandbox(s.ctx, vci, *ociSpec, *s.config, rootFs, r.ID, bundlePath, disableOutput, false)
+		// RV: for s[lit sandbx alread exits
+		sandbox, _, err := katautils.ProxyCreateSandbox(s.ctx, vci, *ociSpec, *s.config, rootFs, r.ID, bundlePath, disableOutput, false)
 		if err != nil {
+			shimLog.WithField("service->create ", 69).Debug("RV create() 69 ERROR")
 			return nil, err
 		}
+		shimLog.WithField("service->create ", 70).Debug("RV create() 6")
 		s.sandbox = sandbox
 		pid, err := s.sandbox.GetHypervisorPid()
 		if err != nil {
+			shimLog.WithField("service->create ", 71).Debug("RV create() 69")
 			return nil, err
 		}
 		s.hpid = uint32(pid)
 
 		if defaultStartManagementServerFunc != nil {
+			shimLog.WithField("service->create ", 72).Debug("RV create() 69")
 			defaultStartManagementServerFunc(s, ctx, ociSpec)
 		}
 
 	case vc.PodContainer:
 		span, ctx := katatrace.Trace(s.ctx, shimLog, "create", shimTracingTags)
+		// RV unused
+		_ = ctx
 		defer span.End()
 
 		if s.sandbox == nil {
 			return nil, fmt.Errorf("BUG: Cannot start the container, since the sandbox hasn't been created")
 		}
 
+		/* RV: Make call to create container
 		if rootFs.Mounted, err = checkAndMount(s, r); err != nil {
 			return nil, err
 		}
@@ -277,12 +310,15 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 				}
 			}
 		}()
-
-		_, err = katautils.CreateContainer(ctx, s.sandbox, *ociSpec, rootFs, r.ID, bundlePath, disableOutput, runtimeConfig.DisableGuestEmptyDir)
+		*/
+		shimLog.WithField("service->create ", 68).Debug("RV vc.PodContainer")
+		_, err = katautils.ProxyCreateContainer(ctx, s.sandbox, *ociSpec, rootFs, r.ID, bundlePath, disableOutput, runtimeConfig.DisableGuestEmptyDir)
 		if err != nil {
 			return nil, err
 		}
 	}
+	// RV: hard-coded! Must be changed
+	//err = nil
 
 	container, err := newContainer(s, r, containerType, ociSpec, rootFs.Mounted)
 	if err != nil {

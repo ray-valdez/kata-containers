@@ -752,9 +752,12 @@ func newContainer(ctx context.Context, sandbox *Sandbox, contConfig *ContainerCo
 	}
 
 	// Unexpected error
-	if !os.IsNotExist(err) && err != errContainerPersistNotExist {
-		return nil, err
-	}
+	// RV: Replace check for persist
+	/*
+		if !os.IsNotExist(err) && err != errContainerPersistNotExist {
+			return nil, err
+		}
+	*/
 
 	// If mounts are block devices, add to devmanager
 	if err := c.createMounts(ctx); err != nil {

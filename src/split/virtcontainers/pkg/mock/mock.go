@@ -17,8 +17,10 @@ import (
 
 	"github.com/containerd/ttrpc"
 	gpb "github.com/gogo/protobuf/types"
-	aTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
+
+	//aTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
 	pb "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols/grpc"
+	aTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 )
 
 const VSockPrefix = "mock://"

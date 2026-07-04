@@ -36,8 +36,12 @@ const CONFIG_JSON: &str = "config.json";
 
 #[rustfmt::skip]
 lazy_static! {
-    pub static ref IMAGE_SERVICE: Mutex<Option<ImageService>> = Mutex::new(None);
+    pub static ref IMAGE_SERVICE: Mutex<Option<Arc<ImageService>>> = Mutex::new(None);
+    //pub static ref IMAGE_SERVICE: Mutex<Option<ImageService>> = Mutex::new(None);
 }
+
+#[derive(Clone)]
+pub struct SharedImageService(pub Arc<ImageService>);
 
 // Convenience function to obtain the scope logger.
 fn sl() -> slog::Logger {
@@ -76,7 +80,8 @@ impl ImageService {
     }
 
     /// Get the singleton instance of image service.
-    pub async fn singleton() -> Result<ImageService> {
+    //pub async fn singleton() -> Result<ImageService> {
+    pub async fn singleton() -> Result<Arc<ImageService>> {
         IMAGE_SERVICE
             .lock()
             .await
@@ -240,6 +245,7 @@ impl ImageService {
 
     /// Pull image when recieving the PullImageRequest and return the image digest.
     async fn pull_image(&self, req: &image::PullImageRequest) -> Result<String> {
+        info!(sl(), "AGENT-pull_image request {:?}", req);
         Self::set_proxy_env_vars();
         let cid = self.cid_from_request(req)?;
         let image = req.image();
@@ -253,6 +259,8 @@ impl ImageService {
         // with rootfs and config.json will store under CONTAINER_BASE/cid.
         let bundle_path = Path::new(CONTAINER_BASE).join(&cid);
         fs::create_dir_all(&bundle_path)?;
+
+        info!(sl(), "AGENT-pull_image bundle_path {:?}", bundle_path);
 
         let decrypt_config = self.get_security_config().await?;
         let source_creds = (!req.source_creds().is_empty()).then(|| req.source_creds());
@@ -269,18 +277,22 @@ impl ImageService {
     }
 
     async fn add_image(&self, image: String, cid: String) {
+        debug!(sl(), "AGENT-add_image  key: {:?}", image);
+        debug!(sl(), "AGENT-add_image  val: {:?}", cid);
         self.images.lock().await.insert(image, cid);
     }
 
     // When being passed an image name through a container annotation, merge its
     // corresponding bundle OCI specification into the passed container creation one.
     pub async fn merge_bundle_oci(&self, container_oci: &mut oci::Spec) -> Result<()> {
-        if let Some(image_name) = container_oci
-            .annotations
-            .get(&ANNO_K8S_IMAGE_NAME.to_string())
-        {
+        if let Some(image_name) = container_oci.annotations.get(ANNO_K8S_IMAGE_NAME) {
+            debug!(sl(), "AGENT-BUNDLE Merging for image name: {}", image_name);
             let images = self.images.lock().await;
-            if let Some(container_id) = images.get(image_name) {
+
+           if let Some(container_id) = images.get(image_name) {
+
+                debug!(sl(), "AGENT-BUNDLE container id: {}", container_id);
+
                 let image_oci_config_path = Path::new(CONTAINER_BASE)
                     .join(container_id)
                     .join(CONFIG_JSON);
@@ -303,10 +315,18 @@ impl ImageService {
                         let root_path = Path::new(CONTAINER_BASE)
                             .join(container_id)
                             .join(image_root.path.clone());
+
                         container_root.path =
                             String::from(root_path.to_str().ok_or_else(|| {
                                 anyhow!("Invalid container image root path {:?}", root_path)
                             })?);
+
+                        debug!(
+                            sl(),
+                            "AGENT-container root path: {:?}", 
+                            container_root.path
+                        )
+
                     }
                 }
 
@@ -315,7 +335,27 @@ impl ImageService {
                         self.merge_oci_process(container_process, image_process);
                     }
                 }
+            } else {
+                debug!(sl(), "AGENT-BUNDLE: Image name not found in images map.");
+                debug!(sl(), "AGENT-BUNDLE Available images map entries:");
+                for (key, value) in images.iter() {
+                    debug!(sl(), "AGENT-BUNDLE  Key: '{}', Value: '{}'", key, value);
+                }
             }
+        } else {
+
+            let expected_key = ANNO_K8S_IMAGE_NAME.to_string();
+            debug!(sl(), "AGENT-BUNDLE Looking for annotation key: '{}'", expected_key);
+
+            match container_oci.annotations.get(&expected_key) {
+                Some(val) => debug!(sl(), "AGENT-BUNDLE: FOUND annotation value for '{}': {}", expected_key, val),
+                None => debug!( sl(),
+                    "AGENT-BUNDLE: MISSING Annotation key '{}'. Available annotations: {:?}",
+                    expected_key,
+                    container_oci.annotations
+                ),
+            }
+
         }
 
         Ok(())
@@ -339,16 +379,16 @@ impl ImageService {
         }
     }
 }
-
+/*
 #[async_trait]
-impl protocols::image_ttrpc_async::Image for ImageService {
+impl protocols::image_ttrpc_async::Image for Arc<ImageService> {
     async fn pull_image(
         &self,
         _ctx: &ttrpc::r#async::TtrpcContext,
         req: image::PullImageRequest,
     ) -> ttrpc::Result<image::PullImageResponse> {
         is_allowed(&req).await?;
-        match self.pull_image(&req).await {
+        match self.as_ref().pull_image(&req).await {
             Ok(r) => {
                 let mut resp = image::PullImageResponse::new();
                 resp.image_ref = r;
@@ -360,9 +400,38 @@ impl protocols::image_ttrpc_async::Image for ImageService {
         }
     }
 }
+*/
+#[async_trait]
+impl protocols::image_ttrpc_async::Image for SharedImageService {
+    async fn pull_image(
+        &self,
+        _ctx: &ttrpc::r#async::TtrpcContext,
+        req: image::PullImageRequest,
+    ) -> ttrpc::Result<image::PullImageResponse> {
+        is_allowed(&req).await?;
+        self.0.pull_image(&req)
+            .await
+            .map(|r| {
+                let mut resp = image::PullImageResponse::new();
+                resp.image_ref = r;
+                resp
+            })
+            .map_err(|e| ttrpc_error(ttrpc::Code::INTERNAL, e.to_string()))
+    }
+}
 
 #[tonic::async_trait]
-impl grpctls::image_server::Image for ImageService {
+impl grpctls::image_server::Image for SharedImageService {
+    async fn pull_image(
+        &self,
+        req: tonic::Request<PullImageRequest>,
+    ) -> Result<tonic::Response<PullImageResponse>, tonic::Status> {
+        self.0.pull_image(req).await
+    }
+}
+
+#[tonic::async_trait]
+impl grpctls::image_server::Image for Arc<ImageService> {
     async fn pull_image(
         &self,
         req: tonic::Request<PullImageRequest>,
@@ -374,7 +443,7 @@ impl grpctls::image_server::Image for ImageService {
         nreq.set_container_id(internal.container_id);
         nreq.set_source_creds(internal.source_creds);
 
-        match self.pull_image(&nreq).await {
+        match (**self).pull_image(&nreq).await {
             Ok(r) => Ok(tonic::Response::new(PullImageResponse { image_ref: r })),
             Err(e) => Err(tonic::Status::new(tonic::Code::Internal, format!("{}", e))),
         }

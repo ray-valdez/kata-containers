@@ -31,6 +31,8 @@ use tonic::transport::{
     Server, ServerTlsConfig,
 };
 
+use crate::image_rpc::SharedImageService;
+
 use crate::rpc::rpctls::grpctls::{
     health_check_response, CheckRequest, CloseStdinRequest, ContainerInfoList, CopyFileRequest,
     CreateContainerRequest, ExecProcessRequest, GetMetricsRequest, GetOomEventRequest,
@@ -887,6 +889,7 @@ pub async fn grpcstart(
     s: Arc<Mutex<Sandbox>>,
     server_address: &str,
     init_mode: bool,
+    image_service: Arc<ImageService>,
 ) -> Result<impl futures::Future<Output = Result<(), tonic::transport::Error>>> {
     let sec_agent = AgentService {
         sandbox: s,
@@ -896,8 +899,12 @@ pub async fn grpcstart(
     };
     let sec_svc = grpctls::sec_agent_service_server::SecAgentServiceServer::new(sec_agent);
 
-    let image_service = ImageService::new();
-    let iservice = grpctls::image_server::ImageServer::new(image_service);
+    //let image_service = ImageService::new();
+
+    // Compiles
+    //let iservice = grpctls::image_server::ImageServer::new(image_service.clone());
+    let shared = SharedImageService(image_service.clone());
+    let iservice = grpctls::image_server::ImageServer::new(shared);
 
     let health_service = HealthService {};
     let hservice = grpctls::health_server::HealthServer::new(health_service);

@@ -23,6 +23,7 @@ use anyhow::{anyhow, Context, Result};
 use cfg_if::cfg_if;
 use clap::{AppSettings, Parser};
 use const_format::concatcp;
+use crate::image_rpc::ImageService;
 use nix::fcntl::OFlag;
 use nix::sys::socket::{self, AddressFamily, SockFlag, SockType, VsockAddr};
 use nix::unistd::{self, dup, Pid};
@@ -413,8 +414,10 @@ async fn start_sandbox(
         };
     };
 
+    let image_service = Arc::new(ImageService::new());
+    *image_rpc::IMAGE_SERVICE.lock().await = Some(image_service.clone()); //Initialize global
     // vsock:///dev/vsock, port
-    let mut server = rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode).await?;
+    let mut server = rpc::start(sandbox.clone(), config.server_addr.as_str(), init_mode, image_service.clone()).await?;
     server.start().await?;
 
     if config.split_api {
@@ -436,7 +439,7 @@ async fn start_sandbox(
             };
 
             let gserver =
-                rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode)
+                rpc::rpctls::grpcstart(sandbox.clone(), config.server_addr.as_str(), init_mode, image_service.clone())
                     .await?;
             gserver.await?;
         }

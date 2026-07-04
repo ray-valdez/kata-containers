@@ -53,6 +53,7 @@ const (
 	acrnHypervisorTableType        = "acrn"
 	dragonballHypervisorTableType  = "dragonball"
 	remoteHypervisorTableType      = "remote"
+	proxyHypervisorTableType       = "proxy"
 
 	// the maximum amount of PCI bridges that can be cold plugged in a VM
 	maxPCIBridges uint32 = 5
@@ -1159,6 +1160,20 @@ func newRemoteHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	}, nil
 }
 
+func newProxyHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
+
+	hypervisor, err := h.path()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	return vc.HypervisorConfig{
+		HypervisorPath:     hypervisor,
+		HypervisorPathList: h.HypervisorPathList,
+	}, nil
+	// return vc.HypervisorConfig{}, nil
+}
+
 func newFactoryConfig(f factory) (oci.FactoryConfig, error) {
 	if f.TemplatePath == "" {
 		f.TemplatePath = defaultTemplatePath
@@ -1198,6 +1213,9 @@ func updateRuntimeConfigHypervisor(configPath string, tomlConf tomlConfig, confi
 		case remoteHypervisorTableType:
 			config.HypervisorType = vc.RemoteHypervisor
 			hConfig, err = newRemoteHypervisorConfig(hypervisor)
+		case proxyHypervisorTableType:
+			config.HypervisorType = vc.ProxyHypervisor
+			hConfig, err = newProxyHypervisorConfig(hypervisor)
 		}
 
 		if err != nil {
@@ -1474,9 +1492,12 @@ func LoadConfiguration(configPath string, ignoreLogging bool) (resolvedConfigPat
 
 	config.DisableGuestEmptyDir = tomlConf.Runtime.DisableGuestEmptyDir
 
-	if err := checkConfig(config); err != nil {
-		return "", config, err
-	}
+	// RV: disable memory chek
+	/*
+		if err := checkConfig(config); err != nil {
+			return "", config, err
+		}
+	*/
 
 	return resolved, config, nil
 }

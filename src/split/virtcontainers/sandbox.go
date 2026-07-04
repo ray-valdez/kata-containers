@@ -42,8 +42,11 @@ import (
 	"github.com/kata-containers/split/src/runtime/virtcontainers/image"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/persist"
 	persistapi "github.com/kata-containers/split/src/runtime/virtcontainers/persist/api"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols/grpc"
+
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/annotations"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/compatoci"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/cpuset"
@@ -435,6 +438,10 @@ func (s *Sandbox) IOStream(containerID, processID string) (io.WriteCloser, io.Re
 	return c.ioStream(processID)
 }
 
+func (s *Sandbox) GetAgentContainers(ctx context.Context) (string, error) {
+	return "", nil
+}
+
 func createAssets(ctx context.Context, sandboxConfig *SandboxConfig) error {
 	span, _ := katatrace.Trace(ctx, nil, "createAssets", sandboxTracingTags, map[string]string{"sandbox_id": sandboxConfig.ID})
 	defer span.End()
@@ -586,7 +593,6 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 			s.store.Destroy(s.id)
 		}
 	}()
-
 	sandboxConfig.HypervisorConfig.VMStorePath = s.store.RunVMStoragePath()
 	sandboxConfig.HypervisorConfig.RunStorePath = s.store.RunStoragePath()
 
@@ -595,6 +601,9 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 		sandboxConfig.HypervisorConfig.SELinuxProcessLabel = spec.Process.SelinuxLabel
 	}
 
+	// Ignore the error. Restore can fail for a new sandbox
+	// RV: trying to  "restore sandbox failed" error message
+	/* */
 	s.devManager = deviceManager.NewDeviceManager(sandboxConfig.HypervisorConfig.BlockDeviceDriver,
 		sandboxConfig.HypervisorConfig.EnableVhostUserStore,
 		sandboxConfig.HypervisorConfig.VhostUserStorePath, sandboxConfig.HypervisorConfig.VhostUserDeviceReconnect, nil)
@@ -603,11 +612,12 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 	if err := s.createResourceController(); err != nil {
 		return nil, err
 	}
-
-	// Ignore the error. Restore can fail for a new sandbox
-	if err := s.Restore(); err != nil {
-		s.Logger().WithError(err).Debug("restore sandbox failed")
-	}
+	// RV: comment
+	/*
+		if err := s.Restore(); err != nil {
+			s.Logger().WithError(err).Debug("restore sandbox failed")
+		}
+	*/
 
 	if err := validateHypervisorConfig(&sandboxConfig.HypervisorConfig); err != nil {
 		return nil, err
@@ -1328,26 +1338,27 @@ func (s *Sandbox) startVM(ctx context.Context, prestartHookFunc func(context.Con
 			s.hypervisor.StopVM(ctx, false)
 		}
 	}()
+	// RV: commente network
+	/*
+		if err := s.network.Run(ctx, func() error {
+			if s.factory != nil {
+				vm, err := s.factory.GetVM(ctx, VMConfig{
+					HypervisorType:   s.config.HypervisorType,
+					HypervisorConfig: s.config.HypervisorConfig,
+					AgentConfig:      s.config.AgentConfig,
+				})
+				if err != nil {
+					return err
+				}
 
-	if err := s.network.Run(ctx, func() error {
-		if s.factory != nil {
-			vm, err := s.factory.GetVM(ctx, VMConfig{
-				HypervisorType:   s.config.HypervisorType,
-				HypervisorConfig: s.config.HypervisorConfig,
-				AgentConfig:      s.config.AgentConfig,
-			})
-			if err != nil {
-				return err
+				return vm.assignSandbox(s)
 			}
 
-			return vm.assignSandbox(s)
+			return s.hypervisor.StartVM(ctx, VmStartTimeout)
+		}); err != nil {
+			return err
 		}
-
-		return s.hypervisor.StartVM(ctx, VmStartTimeout)
-	}); err != nil {
-		return err
-	}
-
+	*/
 	// not sure how we know that this callback has been executed
 	if s.config.HypervisorConfig.ConfidentialGuest && s.config.HypervisorConfig.GuestPreAttestation {
 		if err := s.hypervisor.AttestVM(ctx); err != nil {

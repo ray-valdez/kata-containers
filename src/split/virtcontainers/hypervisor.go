@@ -58,6 +58,9 @@ const (
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
 
+	// ProxyHypervisor is a proxy hypervisor for interacting with the kata-agent
+	ProxyHypervisor HypervisorType = "proxy"
+
 	procCPUInfo = "/proc/cpuinfo"
 
 	defaultVCPUs = 1
@@ -243,6 +246,9 @@ func (hType *HypervisorType) Set(value string) error {
 	case "mock":
 		*hType = MockHypervisor
 		return nil
+	case "proxy":
+		*hType = ProxyHypervisor
+		return nil
 	default:
 		return fmt.Errorf("Unknown hypervisor type %s", value)
 	}
@@ -263,6 +269,8 @@ func (hType *HypervisorType) String() string {
 		return string(RemoteHypervisor)
 	case MockHypervisor:
 		return string(MockHypervisor)
+	case ProxyHypervisor:
+		return string(ProxyHypervisor)
 	default:
 		return ""
 	}

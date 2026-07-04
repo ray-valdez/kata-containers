@@ -258,12 +258,12 @@ func (m *ARPNeighbor) XXX_DiscardUnknown() {
 var xxx_messageInfo_ARPNeighbor proto.InternalMessageInfo
 
 func init() {
-	proto.RegisterEnum("types.IPFamily", IPFamily_name, IPFamily_value)
-	proto.RegisterEnum("types.FSGroupChangePolicy", FSGroupChangePolicy_name, FSGroupChangePolicy_value)
-	proto.RegisterType((*IPAddress)(nil), "types.IPAddress")
-	proto.RegisterType((*Interface)(nil), "types.Interface")
-	proto.RegisterType((*Route)(nil), "types.Route")
-	proto.RegisterType((*ARPNeighbor)(nil), "types.ARPNeighbor")
+	// proto.RegisterEnum("types.IPFamily", IPFamily_name, IPFamily_value)
+//	proto.RegisterEnum("types.FSGroupChangePolicy", FSGroupChangePolicy_name, FSGroupChangePolicy_value)
+//	proto.RegisterType((*IPAddress)(nil), "types.IPAddress")
+//	proto.RegisterType((*Interface)(nil), "types.Interface")
+//	proto.RegisterType((*Route)(nil), "types.Route")
+//	proto.RegisterType((*ARPNeighbor)(nil), "types.ARPNeighbor")
 }
 
 func init() {

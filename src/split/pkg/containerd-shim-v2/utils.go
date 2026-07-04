@@ -10,10 +10,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd/mount"
 	cdshim "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/kata-containers/split/src/runtime/pkg/katautils"
 	"github.com/kata-containers/split/src/runtime/pkg/oci"
@@ -40,12 +38,15 @@ func cleanupContainer(ctx context.Context, sandboxID, cid, bundlePath string) er
 		return err
 	}
 
-	rootfs := filepath.Join(bundlePath, "rootfs")
+	// RV cleanupContainer no neeed to clena rootfs
+	/*
+		rootfs := filepath.Join(bundlePath, "rootfs")
 
-	if err := mount.UnmountAll(rootfs, 0); err != nil {
-		shimLog.WithError(err).WithField("container", cid).Warn("failed to cleanup container rootfs")
-		return err
-	}
+		if err := mount.UnmountAll(rootfs, 0); err != nil {
+			shimLog.WithError(err).WithField("container", cid).Warn("failed to cleanup container rootfs")
+			return err
+		}
+	*/
 
 	return nil
 }

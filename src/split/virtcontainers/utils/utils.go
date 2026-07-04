@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 )
 
 const cpBinaryName = "cp"

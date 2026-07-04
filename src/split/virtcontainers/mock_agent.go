@@ -10,10 +10,14 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/kata-containers/split/src/runtime/virtcontainers/image"
 	persistapi "github.com/kata-containers/split/src/runtime/virtcontainers/persist/api"
+
 	pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/protocols/grpc"
+
+	//pbTypes "github.com/kata-containers/split/src/runtime/virtcontainers/pkg/agent/secprotos"
 	"github.com/kata-containers/split/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )

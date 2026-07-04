@@ -33,7 +33,6 @@ const (
 	// StateCreating represents a sandbox/container that's in creating.
 	StateCreating StateString = "creating"
 )
-
 const (
 	HybridVSockScheme     = "hvsock"
 	MockHybridVSockScheme = "mock"

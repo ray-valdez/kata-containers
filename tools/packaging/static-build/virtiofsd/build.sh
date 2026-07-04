@@ -58,7 +58,7 @@ sudo docker pull ${container_image} || \
 	 # No-op unless PUSH_TO_REGISTRY is exported as "yes"
 	 push_to_registry "${container_image}")
 
-sudo docker run --rm -i -v "${repo_root_dir}:${repo_root_dir}" \
+sudo docker run --runtime=runc  --rm -i -v "${repo_root_dir}:${repo_root_dir}" \
 	-w "${PWD}" \
 	--env DESTDIR="${DESTDIR}" \
 	--env PREFIX="${PREFIX}" \

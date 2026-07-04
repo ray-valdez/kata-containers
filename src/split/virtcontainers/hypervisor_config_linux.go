@@ -6,9 +6,9 @@
 package virtcontainers
 
 import (
-	"fmt"
+	// "fmt"
 
-	"github.com/kata-containers/split/src/runtime/pkg/device/config"
+	// "github.com/kata-containers/split/src/runtime/pkg/device/config"
 )
 
 func validateHypervisorConfig(conf *HypervisorConfig) error {
@@ -16,7 +16,8 @@ func validateHypervisorConfig(conf *HypervisorConfig) error {
 	if conf.RemoteHypervisorSocket != "" {
 		return nil
 	}
-
+	// RV: disable kernelPath
+	/*
 	if conf.KernelPath == "" {
 		return fmt.Errorf("Missing kernel path")
 	}
@@ -66,6 +67,7 @@ func validateHypervisorConfig(conf *HypervisorConfig) error {
 	if conf.Msize9p == 0 && conf.SharedFS != config.VirtioFS {
 		conf.Msize9p = defaultMsize9p
 	}
+	*/
 
 	return nil
 }
